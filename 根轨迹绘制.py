@@ -153,8 +153,8 @@ if __name__ == "__main__":
     #num_str = '(s+6)'
     #den_str = '(s+20)*(s+10)*(s**2)'目前仍然有问题的数据,发生了除零错误
     
-    num_str = '1'
-    den_str = '(s)*(s+4)*(s**2+4*s+20)'#无法标记出复数分离点
+    num_str = '(1)'
+    den_str = '(s)*(s**2+6*s+10)'#无法标记出复数分离点
 
     numerator_coeffs = parse_polynomial_string(num_str)
     denominator_coeffs = parse_polynomial_string(den_str)

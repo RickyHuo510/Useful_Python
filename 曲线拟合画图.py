@@ -5,8 +5,8 @@ from numpy.fft import fft, fftfreq
 import warnings
 import time
 
-x_data = np.array([0.014,0.021,0.031,0.038,0.047,0.062,0.091,0.144])
-y_data = np.array([16.6,27.7,38.5,44.2,49.7,55.2,60.5,66.2])
+x_data = np.array([0.014,0.021,0.031,0.038,0.047,0.062,0.091,0.111])
+y_data = np.array([16.6,49.7,27.7,60.5,55.2,44.2,66.2,38.5])
 
 
 # 2. 输入物理量名称和单位
