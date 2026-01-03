@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 1: 直流电机笔记整理</title>
+    <!-- 引入 MathJax 用于渲染数学公式 -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --paper-bg: #fdfbf7;
+            --ink-color: #2c3e50;
+            --accent-color: #3498db;
+            --highlight-bg: #ecf0f1;
+            --border-color: #bdc3c7;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+            background-color: #e0e5ec;
+            color: var(--ink-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--paper-bg);
+            padding: 40px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1), 0 6px 6px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        /* 顶部装饰模拟夹子或装订 */
+        .container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(to right, #e74c3c, #c0392b);
+            border-radius: 8px 8px 0 0;
+        }
+
+        h1 {
+            font-size: 24px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: var(--accent-color);
+            margin-top: 0;
+        }
+
+        .note-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .note-section:last-child {
+            border-bottom: none;
+        }
+
+        .formula-box {
+            background-color: var(--highlight-bg);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+
+        .annotation {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            font-style: italic;
+            margin-left: 10px;
+        }
+
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .bracket-group {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .bracket-content {
+            border-left: 2px solid var(--ink-color);
+            padding-left: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Chapter 1 直流电机 · 记忆内容</h1>
+
+    <!-- 第1部分：电动势 Ea -->
+    <div class="note-section">
+        <h2>1. 电枢电动势 \( E_a \)</h2>
+        <div class="formula-box">
+            \[ E_a = \frac{N}{2a} E_{av} = \frac{N}{2a} \left( \frac{2p \Phi n}{60} \right) \]
+            <div style="text-align: center; margin-top: 10px;">
+                化简为：\[ E_a = \frac{pN}{60a} \Phi n = C_e \Phi n \]
+            </div>
+        </div>
+        <div class="annotation">
+            <ul>
+                <li>推导来源：由 \( Blv \) 推出，其中 \( v = \frac{\pi D n}{60} \) （注：笔记中提及 \( \pi D \) 为周长）</li>
+                <li>\( N \) 为电枢导体总数</li>
+            </ul>
+        </div>
+        <p><strong>若不计磁饱和：</strong></p>
+        <p>
+            \( E_a = C_e \Phi n = G_{af} I_f \Omega \) <br>
+            <span class="annotation">（注：此处涉及磁路线性假设）</span>
+        </p>
+    </div>
+
+    <!-- 第2部分：电磁转矩 Te -->
+    <div class="note-section">
+        <h2>2. 电磁转矩 \( T_e \)</h2>
+        <p>
+            电枢总电流 \( I_a \)，每条支路上的电流 \( I_c = \frac{I_a}{2a} \)
+        </p>
+        <div class="formula-box">
+            \[ T_e = \frac{pN}{2\pi a} \Phi I_a = C_T \Phi I_a \]
+        </div>
+    </div>
+
+    <!-- 第3部分：中性线 -->
+    <div class="note-section">
+        <h2>3. 几何中性线 vs 物理中性线</h2>
+        <ul>
+            <li><strong>几何中性线、物理中性线</strong></li>
+            <li><strong>电刷放置的位置、主磁极的位置</strong></li>
+            <li><span class="annotation">参考书目：P37, 38</span></li>
+        </ul>
+    </div>
+
+    <!-- 第4部分：绕组 -->
+    <div class="note-section">
+        <h2>4. 单波/单叠绕组的区别与联系</h2>
+        
+        <h3>(1) 节距定义</h3>
+        <ul>
+            <li>\( y_1 \rightarrow \) <strong>第一节距 (Back Pitch)</strong>：每一个元件的跨度。</li>
+            <li>\( y_2 \rightarrow \) <strong>第二节距 (Front Pitch)</strong>：连在同一个换向片上的两条边的距离。</li>
+            <li>\( y_c = y \) <strong>合成节距 (Resultant Pitch)</strong>。</li>
+            <li>\( y_k \) <strong>换向器节距 (Commutator Pitch)</strong>。</li>
+        </ul>
+
+        <div class="flex-row">
+            <div class="col">
+                <div class="bracket-group">
+                    <div style="margin-right: 10px; font-weight: bold;">公式<br>对比</div>
+                    <div class="bracket-content">
+                        <div>
+                            <strong>单叠 (Lap)：</strong><br>
+                            \( y = y_1 - y_2 \)<br>
+                            \( y_c = \pm 1 \) (右行 +1，左行 -1)
+                        </div>
+                        <div>
+                            <strong>单波 (Wave)：</strong><br>
+                            \( y = y_1 + y_2 \)<br>
+                            \( y = y_c \)<br>
+                            \( y_c = \frac{K \pm 1}{p} \) (右行 +1，左行 -1)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3>(2) 其它特征量</h3>
+        <ul>
+            <li>极距：\( \tau = \frac{\pi D}{2p} \) 或 \( \tau = \frac{Z}{2p} \) (以槽数计)</li>
+            <li>元件数 \( S \)，换向片数 \( K \)。</li>
+        </ul>
+    </div>
+
+</div>
+
+</body>
+</html>

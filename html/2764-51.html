@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>51单片机扩展 2764 (作RAM用) 电路图</title>
+<style>
+    body { font-family: 'Arial', sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    .diagram-container {
+        background: #ffffff;
+        border: 1px solid #dcdcdc;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        padding: 40px;
+        position: relative;
+    }
+    h2 { color: #2c3e50; margin-bottom: 5px; }
+    p { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 30px; }
+    
+    /* SVG Styles */
+    svg { overflow: visible; }
+    text { font-family: Consolas, monospace; font-size: 12px; fill: #34495e; pointer-events: none; }
+    .chip-body { fill: #ecf0f1; stroke: #2c3e50; stroke-width: 2.5; rx: 4; ry: 4; filter: drop-shadow(3px 3px 2px rgba(0,0,0,0.1)); }
+    .chip-label { font-size: 14px; font-weight: bold; fill: #2c3e50; anchor: middle; }
+    
+    /* Wires */
+    .wire { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .wire-bus-mixed { stroke: #27ae60; stroke-width: 4; opacity: 0.8; } /* P0 Green */
+    .wire-bus-addr  { stroke: #2980b9; stroke-width: 4; opacity: 0.8; } /* Address Blue */
+    .wire-control   { stroke: #c0392b; stroke-width: 2; } /* Control Red */
+    .wire-control-dash { stroke: #c0392b; stroke-width: 2; stroke-dasharray: 6,4; }
+    
+    /* Joints */
+    .joint { fill: #2c3e50; }
+    .bus-tick { stroke: #2c3e50; stroke-width: 1.5; }
+    
+    /* Highlight Box */
+    .highlight-box { fill: none; stroke: #e67e22; stroke-width: 2; stroke-dasharray: 5,5; rx: 5; }
+</style>
+</head>
+<body>
+
+    <h2>51单片机扩展 2764 EPROM 作为外部 RAM</h2>
+    <p>关键逻辑：使用 RD 信号控制 OE，使 ROM 能够响应 MOVX 读指令</p>
+
+    <div class="diagram-container">
+        <svg width="900" height="550" viewBox="0 0 900 550">
+            
+            <!-- ================= CHIPS ================= -->
+            
+            <!-- MCU -->
+            <rect x="50" y="100" width="140" height="350" class="chip-body" />
+            <text x="120" y="260" text-anchor="middle" class="chip-label">8051 MCU</text>
+            
+            <!-- 74LS138 Decoder -->
+            <rect x="350" y="50" width="120" height="140" class="chip-body" />
+            <text x="410" y="120" text-anchor="middle" class="chip-label">74LS138</text>
+            <text x="410" y="140" text-anchor="middle" style="font-size:10px; fill:#7f8c8d;">(译码器)</text>
+
+            <!-- 74LS373 Latch -->
+            <rect x="350" y="320" width="120" height="140" class="chip-body" />
+            <text x="410" y="390" text-anchor="middle" class="chip-label">74LS373</text>
+            <text x="410" y="410" text-anchor="middle" style="font-size:10px; fill:#7f8c8d;">(地址锁存)</text>
+
+            <!-- 2764 Memory -->
+            <rect x="680" y="100" width="150" height="350" class="chip-body" />
+            <text x="755" y="270" text-anchor="middle" class="chip-label">2764 (8KB)</text>
+            <text x="755" y="290" text-anchor="middle" style="font-size:10px; fill:#7f8c8d;">(Programmed as Data)</text>
+
+            <!-- ================= WIRING: P0 BUS (Mixed Data/Addr) ================= -->
+            <!-- P0 Output from MCU -->
+            <text x="180" y="350" text-anchor="end">P0 (AD0-AD7)</text>
+            <path d="M 190 345 L 300 345" class="wire wire-bus-mixed" />
+            
+            <!-- Branch to 373 (Input) -->
+            <path d="M 300 345 L 350 345" class="wire wire-bus-mixed" />
+            <text x="340" y="340" text-anchor="end" font-size="10">D0-D7</text>
+
+            <!-- Branch to 2764 (Data Bus) - Goes UP and Over -->
+            <path d="M 300 345 L 300 240 L 630 240 L 630 200 L 680 200" class="wire wire-bus-mixed" />
+            <circle cx="300" cy="345" r="4" class="joint" />
+            <text x="670" y="195" text-anchor="end" font-size="10">D0-D7</text>
+            
+            <!-- Bus Slash Label -->
+            <line x1="240" y1="335" x2="250" y2="355" class="bus-tick" />
+            <text x="250" y="335" font-size="10">8</text>
+
+            <!-- ================= WIRING: CONTROL SIGNALS ================= -->
+            
+            <!-- ALE -->
+            <text x="180" y="420" text-anchor="end">ALE</text>
+            <path d="M 190 415 L 410 415 L 410 460" class="wire wire-control" />
+            <text x="420" y="450" font-size="10">G (LE)</text>
+
+            <!-- RD -> OE (THE CRITICAL ONE) -->
+            <text x="180" y="440" text-anchor="end" fill="#c0392b" font-weight="bold">RD (P3.7)</text>
+            <path d="M 190 435 L 755 435 L 755 450" class="wire wire-control-dash" />
+            <text x="765" y="440" font-size="10" fill="#c0392b" font-weight="bold">OE (Output Enable)</text>
+            <text x="550" y="430" fill="#c0392b" font-size="11">关键：读信号接 OE</text>
+
+            <!-- WR (Floating) -->
+            <text x="180" y="400" text-anchor="end" fill="#95a5a6">WR (P3.6)</text>
+            <text x="200" y="400" fill="#95a5a6" font-size="10">NC</text>
+
+            <!-- ================= WIRING: ADDRESS BUS (Blue) ================= -->
+            
+            <!-- Low Address (Output from 373) -->
+            <text x="480" y="340" text-anchor="start" font-size="10">Q0-Q7</text>
+            <path d="M 470 345 L 680 345" class="wire wire-bus-addr" />
+            <text x="670" y="340" text-anchor="end" font-size="10">A0-A7</text>
+            <line x1="580" y1="335" x2="590" y2="355" class="bus-tick" />
+            <text x="590" y="335" font-size="10">8</text>
+
+            <!-- High Address (P2.0-P2.4 Direct to 2764) -->
+            <text x="180" y="160" text-anchor="end">P2.0-P2.4</text>
+            <path d="M 190 155 L 600 155 L 600 300 L 680 300" class="wire wire-bus-addr" />
+            <text x="670" y="295" text-anchor="end" font-size="10">A8-A12</text>
+            <line x1="580" y1="145" x2="590" y2="165" class="bus-tick" />
+            <text x="590" y="145" font-size="10">5</text>
+
+            <!-- High Address (P2.5-P2.7 To Decoder) -->
+            <text x="180" y="130" text-anchor="end">P2.5-P2.7</text>
+            <path d="M 190 125 L 350 125" class="wire wire-bus-addr" />
+            <text x="340" y="120" text-anchor="end" font-size="10">A,B,C</text>
+            <line x1="270" y1="115" x2="280" y2="135" class="bus-tick" />
+            <text x="280" y="115" font-size="10">3</text>
+
+            <!-- ================= WIRING: CHIP SELECT ================= -->
+            
+            <!-- Decoder Output (Y0) to 2764 CS -->
+            <text x="480" y="80" text-anchor="start" font-size="10">Y0</text>
+            <path d="M 470 85 L 755 85 L 755 100" class="wire wire-control" />
+            <text x="765" y="115" font-size="10" fill="#c0392b">CE (Chip Enable)</text>
+
+            <!-- ================= LEGEND ================= -->
+            <rect x="50" y="480" width="220" height="60" fill="white" stroke="#bdc3c7" rx="5" />
+            <line x1="60" y1="495" x2="90" y2="495" class="wire wire-bus-mixed" style="stroke-width:3" />
+            <text x="100" y="500" font-size="11">数据/低位地址 (P0)</text>
+            
+            <line x1="60" y1="515" x2="90" y2="515" class="wire wire-bus-addr" style="stroke-width:3" />
+            <text x="100" y="520" font-size="11">高位地址</text>
+
+            <line x1="60" y1="535" x2="90" y2="535" class="wire wire-control" style="stroke-width:2" />
+            <text x="100" y="540" font-size="11">控制信号</text>
+
+        </svg>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>习题 5-13：同步发电机恒定无功调节有功仿真</title>
+    
+    <!-- 1. 引入 MathJax 配置，告诉它我们要用 $ 符号来写公式 -->
+    <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+    </script>
+    
+    <!-- 2. 引入 MathJax 库文件 (需要联网) -->
+    <script type="text/javascript" id="MathJax-script" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js">
+    </script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { margin-bottom: 10px; }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #eef;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            background-color: #fff;
+            display: block;
+            margin: 0 auto;
+        }
+        .info-panel {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.9em;
+            background: #fafafa;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .legend {
+            margin-top: 10px;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        .legend span {
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        input[type=range] { width: 200px; }
+        .conclusion {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border-left: 5px solid #ffc107;
+        }
+        /* 增加公式显示的间距 */
+        .mjx-chtml { margin: 0 2px; }
+    </style>
+</head>
+<body>
+
+    <h1>电机学 习题 5-13 动态演示</h1>
+    
+    <div class="container">
+        <!-- 这里的 LaTeX 语法 $...$ 现在会被 MathJax 自动渲染 -->
+        <p><strong>场景：</strong>隐极同步发电机并联运行，保持无功功率 $Q$ 不变，增加有功功率 $P$。</p>
+        <p style="font-size: 0.9em; color: #666;">(忽略电枢电阻 $R_a$ 和磁饱和)</p>
+        
+        <div class="controls">
+            <label for="powerP">调节有功功率 $P$:</label>
+            <input type="range" id="powerP" min="10" max="180" value="50">
+            <span id="pVal" style="font-weight:bold; color:blue;">50</span> <span style="font-size:0.8em">kW (模拟值)</span>
+        </div>
+
+        <canvas id="phasorCanvas" width="600" height="400"></canvas>
+
+        <div class="legend">
+            <span style="color: blue;">蓝色: 电压 $\dot{U}$</span>
+            <span style="color: green;">绿色: 电流 $\dot{I}$</span>
+            <span style="color: red;">红色: 电动势 $\dot{E}_0$</span>
+        </div>
+
+        <div class="info-panel">
+            <!-- 使用 HTML 实体避免 JS 动态更新时与 MathJax 冲突 -->
+            <div id="data-delta">功率角 &delta;: 0°</div>
+            <div id="data-ef">励磁电流 <i>I<sub>f</sub></i> (|E<sub>0</sub>|): 0</div>
+            <div id="data-i">电枢电流 |I|: 0</div>
+            <div id="data-pf">功率因数 cos&phi;: 0</div>
+        </div>
+
+        <div class="conclusion">
+            <strong>结论观察：</strong>
+            <ul>
+                <li>随着 $P$ 增加，功率角 $\delta$ 增大。</li>
+                <li>励磁电流 $I_f$ (即空载电动势 $E_0$ 的大小) 随之增大。</li>
+                <li>$\dot{I}$ 的轨迹：<strong>水平直线</strong> (因 $Q$ 恒定，虚部不变)。</li>
+                <li>$\dot{E}_0$ 的轨迹：<strong>垂直直线</strong> (因实部取决于 $U$ 和 $I_qX_s$，保持不变)。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('phasorCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('powerP');
+        const pValDisplay = document.getElementById('pVal');
+
+        // 系统参数 (模拟值)
+        const U_mag = 150; // 电压模值 (像素)
+        const Xs = 0.8;    // 同步电抗
+        const Q_const = 60; // 恒定的无功功率 (对应电流的虚部)
+        
+        // 坐标原点
+        const originX = 100;
+        const originY = 300;
+
+        function drawArrow(fromX, fromY, toX, toY, color, label) {
+            const headlen = 10; 
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+            
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            if(label) {
+                ctx.fillStyle = color;
+                ctx.font = "bold 16px Times New Roman";
+                ctx.fillText(label, toX + 10, toY);
+            }
+        }
+
+        function drawDashedLine(x1, y1, x2, y2) {
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = "#999";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制坐标轴
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(canvas.width - 20, originY); // 实轴
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(originX, 20); // 虚轴
+            ctx.strokeStyle = "#ddd";
+            ctx.stroke();
+            ctx.fillStyle = "#aaa";
+            ctx.font = "12px Arial";
+            ctx.fillText("Re (+P)", canvas.width - 60, originY + 15);
+            ctx.fillText("Im (+j)", originX - 30, 30);
+
+            // 获取输入
+            let P = parseInt(slider.value);
+            pValDisplay.innerText = P;
+
+            // 计算相量
+            let Ix = P;      
+            let Iy = Q_const; 
+            let plot_Ix = Ix;
+            let plot_Iy = -Iy; // 画布坐标系 Y 向下，所以滞后电流这里取负
+            
+            let Ux = U_mag;
+            let Uy = 0;
+
+            // 1. 绘制电压 U (参考向量)
+            drawArrow(originX, originY, originX + Ux, originY - Uy, "blue", "U");
+
+            // 2. 绘制电流 I
+            drawArrow(originX, originY, originX + plot_Ix, originY - plot_Iy, "green", "I");
+
+            // 计算 E0 = U + jIXs
+            // 实部: U + Iy*Xs (注意Iy方向)
+            // 虚部: Ix*Xs
+            let E0_x = U_mag + Iy * Xs;
+            let E0_y = Ix * Xs;
+
+            // 3. 绘制 E0
+            drawArrow(originX, originY, originX + E0_x, originY - E0_y, "red", "E0");
+
+            // 绘制相量三角形连接线 (jIXs)
+            ctx.beginPath();
+            ctx.moveTo(originX + Ux, originY);
+            ctx.lineTo(originX + E0_x, originY - E0_y);
+            ctx.strokeStyle = "orange";
+            ctx.setLineDash([2, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // --- 轨迹显示 ---
+            // I 的轨迹 (水平)
+            drawDashedLine(originX, originY - plot_Iy, originX + 300, originY - plot_Iy);
+            ctx.fillStyle = "#888";
+            ctx.fillText("I 轨迹 (P变化)", originX + 250, originY - plot_Iy - 5);
+
+            // E0 的轨迹 (垂直)
+            drawDashedLine(originX + E0_x, originY, originX + E0_x, originY - 250);
+            ctx.fillStyle = "#888";
+            ctx.fillText("E0 轨迹", originX + E0_x + 5, originY - 250);
+
+            // --- 数据计算 ---
+            let deltaRad = Math.atan2(E0_y, E0_x);
+            let deltaDeg = (deltaRad * 180 / Math.PI).toFixed(1);
+            let E0_mag = Math.sqrt(E0_x*E0_x + E0_y*E0_y).toFixed(1);
+            let I_mag = Math.sqrt(Ix*Ix + Iy*Iy).toFixed(1);
+            let phiRad = Math.atan2(Iy, Ix);
+            let pf = Math.cos(phiRad).toFixed(3);
+
+            // 更新下方数据面板
+            // 注意：这里使用 HTML 实体 (&delta;) 而不是 LaTeX ($delta$)
+            // 这样可以避免每次更新都需要调用 MathJax 重绘，提高性能
+            document.getElementById('data-delta').innerHTML = `功率角 &delta;: <b>${deltaDeg}°</b>`;
+            document.getElementById('data-ef').innerHTML = `励磁电动势 <i>E<sub>0</sub></i>: <b>${E0_mag}</b>`;
+            document.getElementById('data-i').innerHTML = `电枢电流 |I|: <b>${I_mag}</b>`;
+            document.getElementById('data-pf').innerHTML = `功率因数 cos&phi;: <b>${pf}</b>`;
+        }
+
+        slider.addEventListener('input', update);
+        
+        // 页面加载完成后等待一小会再绘制，确保字体加载
+        window.onload = function() {
+            update();
+        };
+
+    </script>
+</body>
+</html>

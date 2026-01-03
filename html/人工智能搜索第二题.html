@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全屏动态搜索树 - 圆盘逻辑演示</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: "Segoe UI", Tahoma, sans-serif; background: #1a1a2e; color: #fff; }
+        #controls { position: fixed; top: 20px; left: 20px; z-index: 100; background: rgba(22, 33, 62, 0.9); padding: 20px; border-radius: 12px; border: 1px solid #0f3460; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        button { background: #e94560; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-right: 10px; transition: 0.3s; }
+        button:hover { background: #ff4d6d; transform: scale(1.05); }
+        #info { margin-top: 15px; font-size: 14px; line-height: 1.6; }
+        .highlight { color: #00d2ff; font-weight: bold; }
+        svg { width: 100vw; height: 100vh; cursor: grab; }
+        svg:active { cursor: grabbing; }
+        .node circle { stroke: #fff; stroke-width: 2px; }
+        .node text { font-size: 12px; fill: #fff; text-shadow: 0 1px 3px #000; }
+        .link { fill: none; stroke: rgba(255,255,255,0.2); stroke-width: 1.5px; }
+        .node-goal circle { fill: #2ed573 !important; stroke-width: 4px; filter: drop-shadow(0 0 8px #2ed573); }
+        .node-pruned circle { fill: #ff4757 !important; opacity: 0.6; }
+        .node-visited circle { fill: #1e90ff; }
+        .edge-label { font-size: 10px; fill: #aaa; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <h2 style="margin:0 0 10px 0;">搜索算法实验</h2>
+    <button onclick="startSearch('BFS')">启动：(2) 广度优先搜索</button>
+    <button onclick="startSearch('B&B')">启动：(3) 分支定界法 (带剪枝)</button>
+    <div id="info">
+        状态说明: <span class="highlight">(A, B, C)</span><br>
+        当前目标代价 (Upper Bound): <span id="ub-val" class="highlight">∞</span><br>
+        已扩展节点数: <span id="node-count" class="highlight">0</span><br>
+        <small style="color:#aaa">* 滚轮缩放，拖拽移动画面</small>
+    </div>
+</div>
+
+<svg id="viz"></svg>
+
+<script>
+    // --- 逻辑定义 ---
+    const rotateL = (v) => ({ '1':'4', '2':'1', '3':'2', '4':'3' }[v]);
+    const rotateR = (v) => ({ '1':'2', '2':'3', '3':'4', '4':'1' }[v]);
+    
+    const START = "222";
+    const GOAL = "321";
+    
+    // 第三问代价
+    const ACTIONS = [
+        { name: 'La', disk: 0, dir: 'L', cost: 3 },
+        { name: 'Lb', disk: 1, dir: 'L', cost: 2 },
+        { name: 'Lc', disk: 2, dir: 'L', cost: 1 },
+        { name: 'Ra', disk: 0, dir: 'R', cost: 6 },
+        { name: 'Rb', disk: 1, dir: 'R', cost: 3 },
+        { name: 'Rc', disk: 2, dir: 'R', cost: 2 }
+    ];
+
+    let svg = d3.select("#viz");
+    let g = svg.append("g");
+    
+    // 启用缩放和平移
+    const zoom = d3.zoom().on("zoom", (event) => g.attr("transform", event.transform));
+    svg.call(zoom);
+
+    let treeData = {};
+    let nodeCounter = 0;
+    let upperBound = Infinity;
+    let visitedMap = new Map(); // 记录 state -> min_cost
+
+    function updateVisuals(data) {
+        const width = window.innerWidth;
+        const root = d3.hierarchy(data);
+        const treeLayout = d3.tree().nodeSize([100, 250]);
+        treeLayout(root);
+
+        // 连线渲染
+        const links = g.selectAll(".link")
+            .data(root.links(), d => d.target.data.id);
+        
+        links.enter().append("path").attr("class", "link")
+            .merge(links)
+            .transition().duration(300)
+            .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x));
+
+        // 节点渲染
+        const nodes = g.selectAll(".node")
+            .data(root.descendants(), d => d.data.id);
+
+        const nodeEnter = nodes.enter().append("g")
+            .attr("class", d => {
+                let cls = "node";
+                if (d.data.name === GOAL) cls += " node-goal";
+                if (d.data.pruned) cls += " node-pruned";
+                if (d.data.visited) cls += " node-visited";
+                return cls;
+            })
+            .attr("transform", d => `translate(${d.y},${d.x})`);
+
+        nodeEnter.append("circle").attr("r", 20);
+        nodeEnter.append("text").attr("dy", "-1.2em").attr("text-anchor", "middle")
+            .text(d => `(${d.data.name.split('').join(',')})`);
+        nodeEnter.append("text").attr("dy", "1.5em").attr("text-anchor", "middle").style("fill", "#00ffcc")
+            .text(d => d.data.cost !== undefined ? `g=${d.data.cost}` : "");
+
+        nodes.merge(nodeEnter).transition().duration(300).attr("transform", d => `translate(${d.y},${d.x})`);
+        
+        nodes.exit().remove();
+        links.exit().remove();
+    }
+
+    async function startSearch(type) {
+        // 重置环境
+        g.selectAll("*").remove();
+        upperBound = Infinity;
+        nodeCounter = 0;
+        visitedMap.clear();
+        document.getElementById("ub-val").innerText = "∞";
+        
+        treeData = { id: "root", name: START, cost: 0, children: [], visited: true };
+        updateVisuals(treeData);
+
+        if (type === 'BFS') {
+            await runBFS();
+        } else {
+            await runBnB();
+        }
+    }
+
+    async function runBFS() {
+        let queue = [treeData];
+        let visitedStates = new Set([START]);
+        
+        while (queue.length > 0) {
+            let current = queue.shift();
+            nodeCounter++;
+            document.getElementById("node-count").innerText = nodeCounter;
+
+            if (current.name === GOAL) {
+                updateVisuals(treeData);
+                alert("BFS 找到路径！深度优先查看绿色节点");
+                return;
+            }
+
+            // 只尝试逆时针 La, Lb, Lc
+            for (let action of ACTIONS.slice(0, 3)) {
+                let s = current.name.split('');
+                s[action.disk] = rotateL(s[action.disk]);
+                let nextStr = s.join('');
+
+                if (!visitedStates.has(nextStr)) {
+                    visitedStates.add(nextStr);
+                    let newNode = { id: Math.random(), name: nextStr, children: [], visited: true };
+                    current.children.push(newNode);
+                    queue.push(newNode);
+                    updateVisuals(treeData);
+                    await new Promise(r => setTimeout(r, 100));
+                }
+            }
+        }
+    }
+
+    async function runBnB() {
+        // 分支定界法 (Uniform Cost Search + Pruning)
+        let openList = [treeData];
+        visitedMap.set(START, 0);
+
+        while (openList.length > 0) {
+            // 每次取代价最小的节点 (实现一致代价搜索)
+            openList.sort((a, b) => a.cost - b.cost);
+            let current = openList.shift();
+
+            // 关键：分支定界剪枝
+            // 如果当前节点代价已经超过或等于已找到的最优解代价，则剪枝
+            if (current.cost >= upperBound) {
+                current.pruned = true;
+                continue; 
+            }
+
+            nodeCounter++;
+            document.getElementById("node-count").innerText = nodeCounter;
+
+            if (current.name === GOAL) {
+                upperBound = current.cost;
+                document.getElementById("ub-val").innerText = upperBound;
+                updateVisuals(treeData);
+                // 注意：为了演示完整逻辑，找到一个解后我们继续搜索是否有更小的解，
+                // 除非队列里剩下的代价都 >= 当前最优。
+                continue; 
+            }
+
+            for (let action of ACTIONS) {
+                let s = current.name.split('');
+                s[action.disk] = (action.dir === 'L') ? rotateL(s[action.disk]) : rotateR(s[action.disk]);
+                let nextStr = s.join('');
+                let nextCost = current.cost + action.cost;
+
+                // 剪枝逻辑：如果新代价已经不优于已找到的目标
+                if (nextCost >= upperBound) continue;
+
+                // 重复节点逻辑：如果以更低代价到达过此状态，则丢弃当前较贵的路径
+                if (visitedMap.has(nextStr) && visitedMap.get(nextStr) <= nextCost) continue;
+                
+                visitedMap.set(nextStr, nextCost);
+                let newNode = { id: Math.random(), name: nextStr, cost: nextCost, children: [], visited: true };
+                current.children.push(newNode);
+                openList.push(newNode);
+                
+                updateVisuals(treeData);
+                await new Promise(r => setTimeout(r, 50)); // 动画速度加快
+            }
+        }
+        alert("分支定界搜索完成！最优代价为: " + upperBound);
+    }
+</script>
+
+</body>
+</html>

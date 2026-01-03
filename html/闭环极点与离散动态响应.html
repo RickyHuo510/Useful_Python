@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离散系统闭环极点与动态响应可视化</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px;
+            margin: 0;
+        }
+        h2 {
+            color: #0033cc;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        p.subtitle {
+            color: #555; 
+            margin-bottom: 30px; 
+            font-size: 16px;
+        }
+        .math {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            font-weight: bold;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            max-width: 1400px; /* 增加最大宽度 */
+        }
+        .panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 20px;
+        }
+        canvas {
+            background-color: #fff;
+            border: 2px solid #eee; /* 加粗边框 */
+            border-radius: 8px;
+            cursor: crosshair;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+        }
+        #timeCanvas {
+            cursor: default;
+        }
+        .info-panel {
+            margin-top: 20px;
+            padding: 15px 25px;
+            background: #f0f9ff;
+            border: 1px solid #bae7ff;
+            border-radius: 8px;
+            width: 100%;
+            text-align: center;
+            font-size: 16px; /* 增大文字 */
+            box-sizing: border-box;
+            line-height: 1.6;
+        }
+        .status-stable { color: #009900; font-weight: bold; }
+        .status-unstable { color: #cc0000; font-weight: bold; }
+        .status-marginal { color: #e67e22; font-weight: bold; }
+        
+        .legend {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>闭环极点的位置与动态响应</h2>
+    <p class="subtitle">点击左侧 Z 平面上的任意位置设定极点，观察右侧时域响应 <span class="math">h[k]</span></p>
+
+    <div class="container">
+        <!-- Z平面 -->
+        <div class="panel">
+            <h3>Z 平面 (极点位置)</h3>
+            <!-- 增大画布尺寸到 450x450 -->
+            <canvas id="zPlaneCanvas" width="650" height="650"></canvas>
+            <div class="legend">绿色圆圈为单位圆 (<span class="math">|z|=1</span>)</div>
+        </div>
+
+        <!-- 时域响应 -->
+        <div class="panel">
+            <h3>动态响应 (脉冲序列)</h3>
+            <!-- 增大画布尺寸到 600x450 -->
+            <canvas id="timeCanvas" width="600" height="450"></canvas>
+            <div class="info-panel" id="infoText">
+                请在 Z 平面上点击...
+            </div>
+        </div>
+    </div>
+
+<script>
+    const zCanvas = document.getElementById('zPlaneCanvas');
+    const zCtx = zCanvas.getContext('2d');
+    const tCanvas = document.getElementById('timeCanvas');
+    const tCtx = tCanvas.getContext('2d');
+    const infoText = document.getElementById('infoText');
+
+    // --- 配置参数 (根据新尺寸调整) ---
+    
+    // Z平面配置
+    const Z_CENTER_X = zCanvas.width / 2;
+    const Z_CENTER_Y = zCanvas.height / 2;
+    // 放大比例：让单位圆占据大部分画面 (半径设为 180px)
+    const Z_SCALE = 180; 
+
+    // 时域图配置
+    const T_MARGIN = 50; // 边距加大
+    const T_WIDTH = tCanvas.width - 2 * T_MARGIN;
+    const T_HEIGHT = tCanvas.height - 2 * T_MARGIN;
+    const T_CENTER_Y = tCanvas.height / 2;
+
+    // 当前极点状态
+    let currentPole = { x: 0.6, y: 0.4 }; // 默认初始值
+
+    // 初始化绘制
+    function init() {
+        drawZPlane();
+        drawTimeResponse();
+        updateInfo();
+    }
+
+    // 绘制 Z 平面
+    function drawZPlane() {
+        zCtx.clearRect(0, 0, zCanvas.width, zCanvas.height);
+
+        // 1. 绘制网格背景 (可选，增加专业感)
+        drawGrid(zCtx, zCanvas.width, zCanvas.height);
+
+        // 2. 绘制坐标轴
+        zCtx.beginPath();
+        zCtx.strokeStyle = '#888';
+        zCtx.lineWidth = 2; // 加粗
+        // X轴 (Re)
+        zCtx.moveTo(0, Z_CENTER_Y);
+        zCtx.lineTo(zCanvas.width, Z_CENTER_Y);
+        // Y轴 (Im)
+        zCtx.moveTo(Z_CENTER_X, 0);
+        zCtx.lineTo(Z_CENTER_X, zCanvas.height);
+        zCtx.stroke();
+        
+        // 坐标轴箭头
+        drawArrow(zCtx, zCanvas.width, Z_CENTER_Y, 'Re');
+        drawArrow(zCtx, Z_CENTER_X, 0, 'Im', 'up');
+
+        // 3. 绘制单位圆
+        zCtx.beginPath();
+        zCtx.strokeStyle = '#28a745'; // 更鲜艳的绿色
+        zCtx.lineWidth = 3; // 加粗
+        zCtx.arc(Z_CENTER_X, Z_CENTER_Y, Z_SCALE, 0, 2 * Math.PI);
+        zCtx.stroke();
+
+        // 4. 标记刻度 1, -1, j, -j
+        zCtx.font = "bold 16px Times New Roman";
+        zCtx.fillStyle = "#444";
+        zCtx.fillText("1", Z_CENTER_X + Z_SCALE + 8, Z_CENTER_Y + 20);
+        zCtx.fillText("-1", Z_CENTER_X - Z_SCALE - 25, Z_CENTER_Y + 20);
+        zCtx.fillText("j", Z_CENTER_X + 10, Z_CENTER_Y - Z_SCALE + 20);
+
+        // 5. 绘制当前极点 (X 形)
+        drawPoleMarker(currentPole.x, currentPole.y);
+        
+        // 如果有虚部，绘制共轭极点
+        if (Math.abs(currentPole.y) > 0.05) {
+            drawPoleMarker(currentPole.x, -currentPole.y, true); 
+        }
+    }
+
+    // 辅助函数：画箭头
+    function drawArrow(ctx, x, y, label, dir='right') {
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        if(dir === 'right') {
+            ctx.moveTo(x, y);
+            ctx.lineTo(x-10, y-6);
+            ctx.lineTo(x-10, y+6);
+            ctx.fillText(label, x-25, y+25);
+        } else {
+            ctx.moveTo(x, y);
+            ctx.lineTo(x-6, y+10);
+            ctx.lineTo(x+6, y+10);
+            ctx.fillText(label, x+15, y+20);
+        }
+        ctx.fill();
+    }
+
+    // 辅助函数：画背景淡网格
+    function drawGrid(ctx, w, h) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#f0f0f0';
+        ctx.lineWidth = 1;
+        const step = 45; // 像素间距
+        for(let x=0; x<=w; x+=step) { ctx.moveTo(x,0); ctx.lineTo(x,h); }
+        for(let y=0; y<=h; y+=step) { ctx.moveTo(0,y); ctx.lineTo(w,y); }
+        ctx.stroke();
+    }
+
+    function drawPoleMarker(re, im, isConjugate = false) {
+        const px = Z_CENTER_X + re * Z_SCALE;
+        const py = Z_CENTER_Y - im * Z_SCALE;
+        const size = 8; // 增大叉号尺寸
+
+        zCtx.beginPath();
+        zCtx.strokeStyle = isConjugate ? 'rgba(220, 53, 69, 0.4)' : '#dc3545'; // 鲜红色
+        zCtx.lineWidth = 3; // 加粗
+        zCtx.moveTo(px - size, py - size);
+        zCtx.lineTo(px + size, py + size);
+        zCtx.moveTo(px + size, py - size);
+        zCtx.lineTo(px - size, py + size);
+        zCtx.stroke();
+    }
+
+    // 绘制时域响应
+    function drawTimeResponse() {
+        tCtx.clearRect(0, 0, tCanvas.width, tCanvas.height);
+        
+        // 绘制网格背景
+        drawGrid(tCtx, tCanvas.width, tCanvas.height);
+
+        // 绘制坐标轴
+        tCtx.beginPath();
+        tCtx.strokeStyle = '#666';
+        tCtx.lineWidth = 2;
+        // k轴
+        tCtx.moveTo(T_MARGIN, T_CENTER_Y);
+        tCtx.lineTo(tCanvas.width - 20, T_CENTER_Y);
+        // h[k]轴
+        tCtx.moveTo(T_MARGIN, tCanvas.height - 20);
+        tCtx.lineTo(T_MARGIN, 20);
+        tCtx.stroke();
+        
+        // 文字
+        tCtx.font = "italic bold 18px Times New Roman";
+        tCtx.fillStyle = "#333";
+        tCtx.fillText("k", tCanvas.width - 30, T_CENTER_Y + 25);
+        tCtx.fillText("h[k]", T_MARGIN - 40, 30);
+
+        // 计算序列
+        const kMax = 30; // 显示更多点
+        const r = Math.sqrt(currentPole.x**2 + currentPole.y**2);
+        const theta = Math.atan2(currentPole.y, currentPole.x);
+        
+        let maxVal = 0;
+        const values = [];
+
+        for (let k = 0; k <= kMax; k++) {
+            let val;
+            if (Math.abs(currentPole.y) < 0.02) {
+                val = Math.pow(currentPole.x, k);
+            } else {
+                val = Math.pow(r, k) * Math.cos(theta * k);
+            }
+            values.push(val);
+            if (Math.abs(val) > maxVal) maxVal = Math.abs(val);
+        }
+
+        // 动态缩放
+        let displayScale = 1;
+        // 稍微留一点余量
+        const availableHeight = (T_HEIGHT / 2) - 30;
+        if (maxVal > 0) {
+            // 限制最大放大倍数，避免很小的值看起来很大
+            // 同时限制最很小倍数，避免发散的值跑出屏幕太远
+            displayScale = availableHeight / Math.min(Math.max(maxVal, 0.5), 10); 
+        }
+
+        // 绘制 Stem Plot
+        tCtx.strokeStyle = '#0066cc'; // 深蓝色杆
+        tCtx.fillStyle = '#0066cc';
+        const stepX = (T_WIDTH - 20) / kMax;
+
+        for (let k = 0; k <= kMax; k++) {
+            const px = T_MARGIN + k * stepX;
+            let rawVal = values[k];
+            
+            // 视觉截断 (Clamp)
+            let plotVal = rawVal * displayScale;
+            const clampLimit = T_HEIGHT / 2;
+            if (plotVal > clampLimit) plotVal = clampLimit;
+            if (plotVal < -clampLimit) plotVal = -clampLimit;
+
+            const py = T_CENTER_Y - plotVal;
+
+            // 绘制杆
+            tCtx.beginPath();
+            tCtx.lineWidth = 2;
+            tCtx.moveTo(px, T_CENTER_Y);
+            tCtx.lineTo(px, py);
+            tCtx.stroke();
+
+            // 绘制圆点
+            tCtx.beginPath();
+            tCtx.arc(px, py, 3.5, 0, 2 * Math.PI); // 更大的点
+            tCtx.fill();
+        }
+    }
+
+    // 更新文本信息
+    function updateInfo() {
+        const r = Math.sqrt(currentPole.x**2 + currentPole.y**2);
+        const re = currentPole.x.toFixed(2);
+        const im = Math.abs(currentPole.y).toFixed(2);
+        
+        // 使用 HTML 实体来显示数学符号
+        let poleText = `<span class="math">z</span> = ${re}`;
+        if (Math.abs(currentPole.y) >= 0.02) {
+            poleText += ` ± j${im}`;
+        }
+        
+        let stability = "";
+        let className = "";
+        let desc = "";
+
+        if (Math.abs(r - 1) < 0.02) {
+            stability = "临界稳定 (Marginally Stable)";
+            className = "status-marginal";
+            desc = "等幅振荡";
+        } else if (r < 1) {
+            stability = "稳定 (Stable)";
+            className = "status-stable";
+            desc = "收敛 (趋于0)";
+        } else {
+            stability = "不稳定 (Unstable)";
+            className = "status-unstable";
+            desc = "发散 (趋于无穷)";
+        }
+        
+        if (Math.abs(currentPole.y) < 0.02) {
+            if (currentPole.x > 0) desc += "，单调变化";
+            else if (currentPole.x < 0) desc += "，交替振荡 (+ - + -)";
+            else desc = "无穷大稳定度 (Deadbeat)";
+        } else {
+            desc += "，正弦振荡包络";
+        }
+
+        infoText.innerHTML = `
+            <div><strong>极点位置：</strong> ${poleText}</div>
+            <div><strong>模长 <span class="math">|z|</span>：</strong> ${r.toFixed(3)}</div>
+            <div class="${className}" style="margin: 10px 0; font-size: 18px;">${stability}</div>
+            <div style="color:#555;">响应特性：${desc}</div>
+        `;
+    }
+
+    // 交互事件
+    zCanvas.addEventListener('mousedown', (e) => {
+        const rect = zCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // 坐标转换
+        let zRe = (mouseX - Z_CENTER_X) / Z_SCALE;
+        let zIm = -(mouseY - Z_CENTER_Y) / Z_SCALE;
+
+        // 增强吸附功能
+        if (Math.abs(zIm) < 0.08) zIm = 0; // 吸附实轴
+        if (Math.abs(zRe) < 0.05) zRe = 0; // 吸附虚轴
+        
+        // 吸附单位圆
+        const r = Math.sqrt(zRe*zRe + zIm*zIm);
+        if (Math.abs(r - 1) < 0.08) {
+            const angle = Math.atan2(zIm, zRe);
+            zRe = Math.cos(angle);
+            zIm = Math.sin(angle);
+        }
+
+        currentPole = { x: zRe, y: zIm };
+        
+        drawZPlane();
+        drawTimeResponse();
+        updateInfo();
+    });
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>

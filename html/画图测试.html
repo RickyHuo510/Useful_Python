@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>直流电机图解整理 (Chapter 1)</title>
+    <!-- 引入 MathJax 渲染公式 -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f4f4;
+            --paper-color: #ffffff;
+            --primary-color: #2c3e50;
+            --secondary-color: #e74c3c;
+            --grid-line: #e0e0e0;
+            --coil-color: #d35400;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--paper-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        h2 {
+            border-left: 5px solid var(--primary-color);
+            padding-left: 15px;
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .caption {
+            text-align: center;
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .handwritten-note {
+            font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; /* 尝试模拟手写字体 */
+            color: #2980b9;
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+
+        /* SVG 通用样式 */
+        svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+        
+        text {
+            font-family: sans-serif;
+            fill: #333;
+        }
+
+        /* 图1-24 specific */
+        .slot-rect { fill: none; stroke: #333; stroke-width: 1; }
+        .comm-rect { fill: none; stroke: #333; stroke-width: 1; }
+        .winding-line { fill: none; stroke: var(--coil-color); stroke-width: 1.5; }
+        .winding-dash { fill: none; stroke: var(--coil-color); stroke-width: 1.5; stroke-dasharray: 4,2; }
+        .brush { fill: #333; opacity: 0.8; }
+        
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- 第一部分：手写笔记整理 -->
+    <div class="card">
+        <h2>1. 笔记：直流电机基础公式与绕组</h2>
+        <p><strong>(1) 电动势与转矩</strong></p>
+        <div style="background:#f9f9f9; padding:15px; border-radius:5px;">
+            <p>
+                \[ E_a = \frac{N}{2a} \cdot \frac{2p\Phi n}{60} = \frac{pN}{60a}\Phi n = C_e \Phi n \]
+            </p>
+            <p>
+                \[ T_e = \frac{pN}{2\pi a} \Phi I_a = C_T \Phi I_a \]
+            </p>
+        </div>
+
+        <p><strong>(2) 单叠/单波绕组对比</strong></p>
+        <table style="width:100%; border-collapse: collapse; margin-top:10px;">
+            <tr style="border-bottom: 2px solid #ddd;">
+                <th style="text-align:left; padding:8px;">类型</th>
+                <th style="text-align:left; padding:8px;">合成节距 \(y\)</th>
+                <th style="text-align:left; padding:8px;">换向器节距 \(y_c\)</th>
+            </tr>
+            <tr>
+                <td style="padding:8px;">单叠 (Lap)</td>
+                <td style="padding:8px;">\( y = y_1 - y_2 \)</td>
+                <td style="padding:8px;">\( y_c = \pm 1 \)</td>
+            </tr>
+            <tr>
+                <td style="padding:8px;">单波 (Wave)</td>
+                <td style="padding:8px;">\( y = y_1 + y_2 \)</td>
+                <td style="padding:8px;">\( y_c = \frac{K \pm 1}{p} \)</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- 第二部分：图1-22 剖面图 -->
+    <div class="card">
+        <h2>2. 图 1-22：单叠绕组元件分布示意图</h2>
+        
+        <svg width="400" height="400" viewBox="-200 -200 400 400">
+            <!-- 定义箭头 -->
+            <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,6 L9,3 z" fill="#333" />
+                </marker>
+            </defs>
+
+            <!-- 磁极 (N极在上，S极在下) -->
+            <path d="M -80 -160 Q 0 -100 80 -160 L 80 -120 Q 0 -60 -80 -120 Z" fill="none" stroke="#000" stroke-width="2"/>
+            <text x="-5" y="-135" font-weight="bold" font-size="16">N</text>
+            
+            <path d="M -80 160 Q 0 100 80 160 L 80 120 Q 0 60 -80 120 Z" fill="none" stroke="#000" stroke-width="2"/>
+            <text x="-5" y="145" font-weight="bold" font-size="16">S</text>
+
+            <!-- 磁极线圈示意 -->
+            <circle cx="-90" cy="-140" r="5" stroke="#000" fill="none"/><circle cx="90" cy="-140" r="5" stroke="#000" fill="none"/>
+            <circle cx="-90" cy="140" r="5" stroke="#000" fill="none"/><circle cx="90" cy="140" r="5" stroke="#000" fill="none"/>
+
+            <!-- 电枢圆 -->
+            <circle cx="0" cy="0" r="90" fill="#fff" stroke="#000" stroke-width="2"/>
+            <circle cx="0" cy="0" r="40" fill="none" stroke="#000" stroke-width="1" stroke-dasharray="5,5"/>
+
+            <!-- 轴线 -->
+            <line x1="0" y1="-180" x2="0" y2="180" stroke="#000" stroke-dasharray="10,5" stroke-width="1"/>
+            <text x="5" y="-185" font-size="12">直轴</text>
+            
+            <line x1="-120" y1="0" x2="120" y2="0" stroke="#000" stroke-dasharray="10,5" stroke-width="1"/>
+            <text x="125" y="5" font-size="12">交轴</text>
+
+            <!-- 导体分布 (模拟画法) -->
+            <!-- 上半部分导体（电流流出 .） -->
+            <g id="upper-conductors">
+                <script>
+                    // 简单的脚本生成圆周分布
+                    // 实际HTML中这里直接写死几个示例
+                </script>
+                <!-- 这里手动画几个示意的 -->
+                <!-- 上半圆 -->
+                <g fill="#fff" stroke="#c0392b" stroke-width="1.5">
+                    <circle cx="-70" cy="-40" r="4"/><circle cx="-50" cy="-65" r="4"/><circle cx="-25" cy="-80" r="4"/>
+                    <circle cx="0" cy="-85" r="4"/>
+                    <circle cx="25" cy="-80" r="4"/><circle cx="50" cy="-65" r="4"/><circle cx="70" cy="-40" r="4"/>
+                </g>
+                <!-- 点 (流出) -->
+                <g fill="#c0392b">
+                    <circle cx="-70" cy="-40" r="1"/><circle cx="-50" cy="-65" r="1"/><circle cx="-25" cy="-80" r="1"/>
+                    <circle cx="0" cy="-85" r="1"/>
+                    <circle cx="25" cy="-80" r="1"/><circle cx="50" cy="-65" r="1"/><circle cx="70" cy="-40" r="1"/>
+                </g>
+            </g>
+
+            <!-- 下半部分导体（电流流入 x） -->
+            <g id="lower-conductors">
+                <g fill="#fff" stroke="#c0392b" stroke-width="1.5">
+                    <circle cx="-70" cy="40" r="4"/><circle cx="-50" cy="65" r="4"/><circle cx="-25" cy="80" r="4"/>
+                    <circle cx="0" cy="85" r="4"/>
+                    <circle cx="25" cy="80" r="4"/><circle cx="50" cy="65" r="4"/><circle cx="70" cy="40" r="4"/>
+                </g>
+                <!-- 叉 (流入) -->
+                <g stroke="#c0392b" stroke-width="1">
+                    <path d="M-72 38 l4 4 M-68 38 l-4 4"/>
+                    <path d="M-52 63 l4 4 M-48 63 l-4 4"/>
+                    <path d="M-27 78 l4 4 M-23 78 l-4 4"/>
+                    <path d="M-2 83 l4 4 M2 83 l-4 4"/>
+                    <path d="M23 78 l4 4 M27 78 l-4 4"/>
+                    <path d="M48 63 l4 4 M52 63 l-4 4"/>
+                    <path d="M68 38 l4 4 M72 38 l-4 4"/>
+                </g>
+            </g>
+
+            <!-- 电刷 -->
+            <rect x="-105" y="-10" width="15" height="20" fill="#333" />
+            <rect x="90" y="-10" width="15" height="20" fill="#333" />
+            <text x="-145" y="5" font-size="12">电刷</text>
+            <line x1="-125" y1="0" x2="-105" y2="0" stroke="#000" stroke-width="1"/>
+
+        </svg>
+        <div class="caption">图 1-22 单叠绕组元件在电枢表面的分布示意图</div>
+        <div class="handwritten-note">
+            笔记要点：一个极下对应的电流方向是一致的。
+        </div>
+    </div>
+
+    <!-- 第三部分：图1-23 连接表 -->
+    <div class="card">
+        <h2>3. 图 1-23：单波绕组连接表示意</h2>
+        <svg width="800" height="200" viewBox="0 0 800 200">
+            <!-- 样式 -->
+            <style>
+                .wave-line { fill:none; stroke: #555; stroke-width: 1.5; }
+                .label-text { font-size: 14px; text-anchor: middle; font-family: serif;}
+            </style>
+
+            <!-- 波形绘制 -->
+            <!-- 第一波 -->
+            <path d="M 50 150 L 100 50 L 150 150" class="wave-line" />
+            <path d="M 150 150 L 200 50 L 250 150" class="wave-line" />
+            <path d="M 250 150 L 300 50 L 350 150" class="wave-line" />
+            <path d="M 350 150 L 400 50 L 450 150" class="wave-line" />
+            <!-- 省略部分 -->
+            <path d="M 450 150 L 480 90" class="wave-line" stroke-dasharray="4,2"/>
+            <path d="M 520 90 L 550 150" class="wave-line" stroke-dasharray="4,2"/>
+            <!-- 结尾 -->
+            <path d="M 550 150 L 600 50 L 650 150" class="wave-line" />
+
+            <!-- 箭头 -->
+            <path d="M 85 80 L 90 70 L 105 80" fill="none" stroke="#555" stroke-width="1.5"/>
+            <path d="M 185 80 L 190 70 L 205 80" fill="none" stroke="#555" stroke-width="1.5"/>
+
+            <!-- 标号 (上层边) -->
+            <text x="100" y="40" class="label-text">1</text>
+            <text x="200" y="40" class="label-text">14</text>
+            <text x="300" y="40" class="label-text">2</text>
+            <text x="400" y="40" class="label-text">15</text>
+            <text x="600" y="40" class="label-text">...</text>
+
+            <!-- 标号 (换向片) -->
+            <text x="50" y="170" class="label-text">y₁=3</text>
+            <text x="150" y="170" class="label-text">1</text>
+            <text x="250" y="170" class="label-text">8</text>
+            <text x="350" y="170" class="label-text">2</text>
+        </svg>
+        <div class="caption">图 1-23 单波绕组连接表 (示意)</div>
+    </div>
+
+    <!-- 第四部分：图1-24 展开图 -->
+    <div class="card">
+        <h2>4. 图 1-24：单波绕组展开图 (a) & (b)</h2>
+        
+        <svg width="800" height="350" viewBox="0 0 800 350">
+            <!-- 背景网格线 (可选) -->
+            
+            <!-- (a) 部分展开图示意 -->
+            <g transform="translate(50, 20)">
+                <text x="0" y="0" font-weight="bold"> (a) 部分展开图</text>
+                
+                <!-- 槽位方框 -->
+                <rect x="0" y="30" width="40" height="40" class="slot-rect"/>
+                <text x="20" y="55" text-anchor="middle" font-size="12">13</text>
+                
+                <rect x="60" y="30" width="40" height="40" class="slot-rect"/>
+                <text x="80" y="55" text-anchor="middle" font-size="12">S 14</text>
+
+                <rect x="120" y="30" width="40" height="40" class="slot-rect"/>
+                <text x="140" y="55" text-anchor="middle" font-size="12">15</text>
+
+                <rect x="220" y="30" width="40" height="40" class="slot-rect"/>
+                <text x="240" y="55" text-anchor="middle" font-size="12">2 N 3</text>
+
+                <!-- 连接线示意 -->
+                <path d="M 80 30 L 140 -10 L 220 30" class="winding-dash" /> <!-- 虚线 -->
+                <path d="M 80 70 L 20 110 L -40 70" class="winding-line" />   <!-- 实线 -->
+            </g>
+
+            <!-- (b) 全部展开图示意 -->
+            <g transform="translate(0, 150)">
+                 <text x="50" y="0" font-weight="bold"> (b) 全部展开图 (缩略)</text>
+                
+                 <!-- 模拟复杂的菱形网格 -->
+                 <defs>
+                     <pattern id="windingPattern" x="0" y="0" width="60" height="100" patternUnits="userSpaceOnUse">
+                         <!-- 实线（前端连接） -->
+                         <path d="M 10 50 L 30 100 L 50 50" class="winding-line" stroke="#c0392b" fill="none"/>
+                         <!-- 虚线（后端连接） -->
+                         <path d="M 10 50 L 30 0 L 50 50" class="winding-dash" stroke="#c0392b" fill="none"/>
+                         <!-- 槽 -->
+                         <rect x="15" y="35" width="30" height="30" fill="white" stroke="#333" stroke-width="1"/>
+                     </pattern>
+                 </defs>
+                 
+                 <!-- 应用图案填充来模拟重复的绕组 -->
+                 <rect x="50" y="20" width="700" height="100" fill="url(#windingPattern)" />
+                 
+                 <!-- 底部换向片 -->
+                 <g transform="translate(50, 130)">
+                     <rect x="0" y="0" width="40" height="20" class="comm-rect" /><text x="20" y="15" text-anchor="middle" font-size="10">15</text>
+                     <rect x="40" y="0" width="40" height="20" class="comm-rect" /><text x="60" y="15" text-anchor="middle" font-size="10">1</text>
+                     <rect x="80" y="0" width="40" height="20" class="comm-rect" /><text x="100" y="15" text-anchor="middle" font-size="10">2</text>
+                     <rect x="120" y="0" width="40" height="20" class="comm-rect" /><text x="140" y="15" text-anchor="middle" font-size="10">3</text>
+                     <rect x="160" y="0" width="40" height="20" class="comm-rect" /><text x="180" y="15" text-anchor="middle" font-size="10">4</text>
+                     <rect x="200" y="0" width="40" height="20" class="comm-rect" /><text x="220" y="15" text-anchor="middle" font-size="10">5</text>
+                     <rect x="240" y="0" width="40" height="20" class="comm-rect" /><text x="260" y="15" text-anchor="middle" font-size="10">6</text>
+                     <!-- 电刷 -->
+                     <rect x="60" y="-5" width="40" height="10" fill="#333" opacity="0.8"/>
+                     <text x="80" y="35" text-anchor="middle" font-weight="bold">B2</text>
+                     <rect x="220" y="-5" width="40" height="10" fill="#333" opacity="0.8"/>
+                     <text x="240" y="35" text-anchor="middle" font-weight="bold">A1</text>
+                 </g>
+            </g>
+        </svg>
+        <div class="caption">图 1-24 单波绕组展开图 (注：为便于网页展示，仅绘制了结构逻辑)</div>
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太阳系模拟 (Canvas)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden; /* 防止出现滚动条 */
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="info">太阳系模拟：八大行星公转 (非真实比例)</div>
+    <canvas id="solarSystem"></canvas>
+
+    <script>
+        const canvas = document.getElementById('solarSystem');
+        const ctx = canvas.getContext('2d');
+
+        let width, height, centerX, centerY;
+
+        // 初始化画布大小
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            centerX = width / 2;
+            centerY = height / 2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 行星数据 (为了视觉效果，大小、距离和速度并非完全按照真实比例，而是进行了艺术化调整)
+        const planets = [
+            { name: "水星", color: "#A5A5A5", size: 4, distance: 60, speed: 0.04 },
+            { name: "金星", color: "#D4A05B", size: 6, distance: 90, speed: 0.03 },
+            { name: "地球", color: "#2B98D8", size: 6.5, distance: 130, speed: 0.02 },
+            { name: "火星", color: "#E35E49", size: 5, distance: 170, speed: 0.016 },
+            { name: "木星", color: "#D6A56E", size: 18, distance: 240, speed: 0.008 },
+            { name: "土星", color: "#D9C683", size: 15, distance: 320, speed: 0.006, ring: true },
+            { name: "天王星", color: "#84D3DB", size: 10, distance: 390, speed: 0.004 },
+            { name: "海王星", color: "#4B70DD", size: 10, distance: 450, speed: 0.003 }
+        ];
+
+        // 随机生成星星背景
+        const stars = [];
+        for (let i = 0; i < 500; i++) {
+            stars.push({
+                x: Math.random() * 2000, // 初始范围大一点，覆盖全屏
+                y: Math.random() * 2000,
+                size: Math.random() * 1.5,
+                opacity: Math.random()
+            });
+        }
+
+        let angleOffset = 0;
+
+        function draw() {
+            // 1. 清空画布
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // 使用半透明黑色产生拖尾效果，如果不想要拖尾改成 'black'
+            ctx.fillRect(0, 0, width, height);
+
+            // 2. 绘制星星背景
+            ctx.fillStyle = "white";
+            stars.forEach(star => {
+                ctx.globalAlpha = star.opacity;
+                ctx.beginPath();
+                ctx.arc(star.x % width, star.y % height, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // 3. 绘制太阳
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
+            ctx.fillStyle = "#FFD700"; // 金色
+            ctx.shadowBlur = 50;       // 发光效果
+            ctx.shadowColor = "#FFD700";
+            ctx.fill();
+            ctx.shadowBlur = 0;        // 重置阴影
+
+            // 4. 绘制行星
+            planets.forEach((planet, index) => {
+                // 计算当前角度 (基于时间流逝)
+                const angle = Date.now() * 0.001 * planet.speed + (index * 100); 
+                
+                // 计算行星位置
+                const x = centerX + Math.cos(angle) * planet.distance;
+                const y = centerY + Math.sin(angle) * planet.distance;
+
+                // 绘制轨道线
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+                ctx.lineWidth = 1;
+                ctx.arc(centerX, centerY, planet.distance, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 绘制行星本体
+                ctx.beginPath();
+                ctx.fillStyle = planet.color;
+                ctx.arc(x, y, planet.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 如果是土星，画个光环
+                if (planet.ring) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = "rgba(200, 200, 200, 0.6)";
+                    ctx.lineWidth = 2;
+                    ctx.ellipse(x, y, planet.size + 8, planet.size + 2, angle, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // 绘制文字标签 (可选)
+                ctx.fillStyle = "white";
+                ctx.font = "10px Arial";
+                ctx.fillText(planet.name, x - 10, y - planet.size - 5);
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>

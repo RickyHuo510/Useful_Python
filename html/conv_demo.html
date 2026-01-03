@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卷积可视化：锚点与Same模式修正版</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --input-color: #bbdefb;
+            --kernel-color: #ffcdd2;
+            --output-color: #c8e6c9;
+            --padding-color: #eeeeee;
+            --highlight-border: #f57f17;
+            --anchor-dot: #d32f2f;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .controls-wrapper {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="number"] { width: 50px; padding: 5px; text-align: center; }
+        
+        button {
+            padding: 8px 16px;
+            border: 1px solid #ccc;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+        button:hover { background: #f0f0f0; }
+        button.active { background: #4caf50; color: white; border-color: #388e3c; }
+        button.primary { background: #2196f3; color: white; border-color: #1565c0; }
+
+        /* Grid Styles */
+        .stage {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .matrix-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .grid {
+            display: grid;
+            gap: 3px;
+            padding: 5px;
+            background: #ccc;
+            border-radius: 4px;
+        }
+
+        .cell {
+            width: 45px;
+            height: 45px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            font-weight: bold;
+            position: relative;
+            user-select: none;
+        }
+
+        /* Colors */
+        .c-input { background-color: var(--input-color); }
+        .c-kernel { background-color: var(--kernel-color); }
+        .c-output { background-color: var(--output-color); }
+        .c-pad { background-color: var(--padding-color); color: #aaa; border: 1px dashed #bbb; }
+
+        /* Anchor Point Dot */
+        .anchor-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--anchor-dot);
+            border-radius: 50%;
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            box-shadow: 0 0 2px white;
+            z-index: 10;
+        }
+
+        /* Highlights */
+        .hl-scan {
+            box-shadow: 0 0 0 3px var(--highlight-border);
+            z-index: 5;
+            transform: scale(1.05);
+        }
+        
+        .hl-target {
+            background-color: #43a047 !important;
+            color: white !important;
+            transform: scale(1.1);
+        }
+
+        .math-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #333;
+            color: #fff;
+            border-radius: 5px;
+            font-family: monospace;
+            min-width: 300px;
+            text-align: center;
+        }
+        
+        .desc { font-size: 0.9em; color: #666; margin-top: 5px; }
+
+        input { border:none; background:transparent; width:100%; height:100%; text-align:center; font-weight:bold; font-size:14px;}
+        input:focus { outline:none; }
+    </style>
+</head>
+<body>
+
+    <h1>卷积原理修正版：锚点与填充</h1>
+
+    <div class="controls-wrapper">
+        <div class="control-row">
+            <div>
+                <label>输入 (Input):</label>
+                <input type="number" id="in-h" value="3" min="2" max="6" style="border:1px solid #ccc; width:40px"> × 
+                <input type="number" id="in-w" value="3" min="2" max="6" style="border:1px solid #ccc; width:40px">
+            </div>
+            <div>
+                <label>卷积核 (Kernel):</label>
+                <input type="number" id="k-h" value="2" min="1" max="5" style="border:1px solid #ccc; width:40px"> × 
+                <input type="number" id="k-w" value="2" min="1" max="5" style="border:1px solid #ccc; width:40px">
+            </div>
+            <button onclick="resetData()">重置数据</button>
+        </div>
+
+        <div class="control-row">
+            <label>模式:</label>
+            <button onclick="setMode('valid')" id="btn-valid">Valid (窄)</button>
+            <button onclick="setMode('same')" id="btn-same" class="active">Same (等宽)</button>
+            <button onclick="setMode('full')" id="btn-full">Full (宽)</button>
+        </div>
+
+        <div class="control-row">
+            <button class="primary" onclick="step(-1)">⏮ 上一步</button>
+            <button class="primary" id="play-btn" onclick="togglePlay()">▶ 自动播放</button>
+            <button class="primary" onclick="step(1)">下一步 ⏭</button>
+        </div>
+        
+        <div class="desc" id="status-text"></div>
+    </div>
+
+    <div class="stage">
+        <div class="matrix-container">
+            <h4>输入 (Input) <span id="dim-in"></span></h4>
+            <div id="grid-in" class="grid"></div>
+        </div>
+        
+        <div class="matrix-container">
+            <h4>卷积核 (Kernel) <span id="dim-ker"></span></h4>
+            <div style="font-size:12px; color:#d32f2f; margin-bottom:5px;">🔴 = 锚点</div>
+            <div id="grid-ker" class="grid"></div>
+        </div>
+
+        <div class="matrix-container">
+            <h4>输出 (Output) <span id="dim-out"></span></h4>
+            <div id="grid-out" class="grid"></div>
+        </div>
+    </div>
+
+    <div class="math-box" id="math-display">准备就绪</div>
+
+<script>
+    // State
+    let config = {
+        inRows: 3, inCols: 3,
+        kRows: 2, kCols: 2,
+        mode: 'same', // valid, same, full
+        dataInput: [],
+        dataKernel: [],
+        padding: {t:0, b:0, l:0, r:0},
+        stride: 1
+    };
+
+    let steps = [];
+    let curStep = -1;
+    let timer = null;
+
+    // --- Init ---
+    function init() {
+        // Read Inputs
+        config.inRows = parseInt(document.getElementById('in-h').value);
+        config.inCols = parseInt(document.getElementById('in-w').value);
+        config.kRows = parseInt(document.getElementById('k-h').value);
+        config.kCols = parseInt(document.getElementById('k-w').value);
+
+        // Generate Random Data
+        config.dataInput = createMatrix(config.inRows, config.inCols, () => Math.floor(Math.random()*9)+1);
+        config.dataKernel = createMatrix(config.kRows, config.kCols, () => Math.floor(Math.random()*5));
+
+        // Hardcode user's example if sizes match
+        if(config.inRows===3 && config.kRows===2) {
+            config.dataInput = [[2,3,8],[6,1,5],[7,2,-1]];
+            config.dataKernel = [[4,1],[2,3]];
+        }
+
+        recalc();
+    }
+
+    function createMatrix(r, c, fn) {
+        return Array.from({length:r}, (_, i) => Array.from({length:c}, (_, j) => fn(i, j)));
+    }
+
+    function resetData() {
+        stop();
+        init();
+    }
+
+    function setMode(m) {
+        config.mode = m;
+        document.querySelectorAll('button').forEach(b => {
+            if(b.id.startsWith('btn-')) b.className = '';
+        });
+        document.getElementById('btn-'+m).className = 'active';
+        recalc();
+    }
+
+    // --- Calculation Logic (The Fix) ---
+    function recalc() {
+        stop();
+        curStep = -1;
+        steps = [];
+
+        // 1. Calculate Padding
+        // Logic: Total Pad = (Out - 1)*S + K - In.
+        // For Same: Out = In. => Total Pad = K - 1.
+        // Distribution: TF style 'SAME' puts extra padding on Right/Bottom.
+        let pH=0, pW=0; // Total
+        
+        if (config.mode === 'valid') {
+            pH = 0; pW = 0;
+        } else if (config.mode === 'same') {
+            pH = Math.max(0, config.kRows - 1);
+            pW = Math.max(0, config.kCols - 1);
+        } else if (config.mode === 'full') {
+            pH = (config.kRows - 1) * 2;
+            pW = (config.kCols - 1) * 2;
+        }
+
+        // Asymmetric Padding Distribution (Top-Left Anchor Logic)
+        // If mode is Full, we usually center.
+        // If mode is Same, we pad right/bottom more.
+        if (config.mode === 'full') {
+            config.padding.t = Math.floor(pH/2); config.padding.b = pH - config.padding.t;
+            config.padding.l = Math.floor(pW/2); config.padding.r = pW - config.padding.l;
+        } else {
+            // Standard "Same": Pad 0 on top/left (Anchor at 0,0), Pad rest on bot/right
+            // Wait, standard anchor for odd kernels is center. 
+            // For 2x2 (even), anchor is TL. So we pad right/bottom.
+            // For 3x3 (odd), anchor is Center. We pad surround.
+            // Let's implement the generic formula: Pad_Left = floor(Total/2), Pad_Right = Total - Left.
+            config.padding.t = Math.floor(pH/2);
+            config.padding.b = pH - config.padding.t;
+            config.padding.l = Math.floor(pW/2);
+            config.padding.r = pW - config.padding.l;
+        }
+
+        // 2. Calculate Output Dims
+        const paddedH = config.inRows + config.padding.t + config.padding.b;
+        const paddedW = config.inCols + config.padding.l + config.padding.r;
+        const outH = paddedH - config.kRows + 1;
+        const outW = paddedW - config.kCols + 1;
+
+        // 3. Generate Steps
+        for(let i=0; i<outH; i++) {
+            for(let j=0; j<outW; j++) {
+                // Determine Convolution Window relative to Padded Grid
+                let sum = 0;
+                let mathStr = "";
+                let highlights = [];
+
+                for(let ki=0; ki<config.kRows; ki++) {
+                    for(let kj=0; kj<config.kCols; kj++) {
+                        // Position in Padded Grid
+                        let py = i + ki;
+                        let px = j + kj;
+                        
+                        // Check if it hits real data
+                        // Real data is at [padding.t ... padding.t + inRows]
+                        let realY = py - config.padding.t;
+                        let realX = px - config.padding.l;
+
+                        let valIn = 0;
+                        let isPad = true;
+                        if(realY >= 0 && realY < config.inRows && realX >= 0 && realX < config.inCols) {
+                            valIn = config.dataInput[realY][realX];
+                            isPad = false;
+                        }
+
+                        let valK = config.dataKernel[ki][kj];
+                        sum += valIn * valK;
+
+                        // Only add to math string if not 0*0 (to save space)
+                        if(!isPad || valK !==0) {
+                             mathStr += `(${valIn}×${valK}) + `;
+                        }
+
+                        highlights.push({
+                            type: isPad ? 'pad' : 'real',
+                            r: realY, c: realX, // Coordinates relative to INPUT grid (pad uses virtual coords)
+                            pr: py, pc: px      // Coordinates relative to PADDED grid
+                        });
+                    }
+                }
+
+                steps.push({
+                    outR: i, outC: j,
+                    val: sum,
+                    math: mathStr.slice(0, -3) + " = " + sum,
+                    hl: highlights
+                });
+            }
+        }
+
+        drawGrids(paddedH, paddedW, outH, outW);
+        updateStatus();
+    }
+
+    // --- Rendering ---
+    function drawGrids(ph, pw, oh, ow) {
+        const divIn = document.getElementById('grid-in');
+        const divKer = document.getElementById('grid-ker');
+        const divOut = document.getElementById('grid-out');
+
+        // Draw Input (with Padding Visualized)
+        divIn.style.gridTemplateColumns = `repeat(${pw}, 45px)`;
+        divIn.innerHTML = '';
+        
+        // We render the PADDED grid, but style real/pad differently
+        for(let r=0; r<ph; r++) {
+            for(let c=0; c<pw; c++) {
+                let el = document.createElement('div');
+                let realR = r - config.padding.t;
+                let realC = c - config.padding.l;
+                
+                if(realR >=0 && realR < config.inRows && realC >= 0 && realC < config.inCols) {
+                    el.className = 'cell c-input';
+                    el.innerHTML = `<input value="${config.dataInput[realR][realC]}" onchange="updateVal('in',${realR},${realC},this.value)">`;
+                    el.id = `cell-in-${realR}-${realC}`; // Real ID
+                } else {
+                    el.className = 'cell c-pad';
+                    el.textContent = '0';
+                    el.id = `cell-pad-${r}-${c}`; // Pad ID using padded coords
+                }
+                divIn.appendChild(el);
+            }
+        }
+
+        // Draw Kernel
+        divKer.style.gridTemplateColumns = `repeat(${config.kCols}, 45px)`;
+        divKer.innerHTML = '';
+        // Anchor Logic: For this demo, assuming top-left (0,0) is anchor for even, center for odd?
+        // Actually, the visualization highlights the WHOLE kernel. 
+        // We just draw the red dot at (0,0) to match user's mental model of "Top Left Anchor".
+        for(let r=0; r<config.kRows; r++) {
+            for(let c=0; c<config.kCols; c++) {
+                let el = document.createElement('div');
+                el.className = 'cell c-kernel';
+                el.innerHTML = `<input value="${config.dataKernel[r][c]}" onchange="updateVal('k',${r},${c},this.value)">`;
+                
+                // Add Anchor Dot at (0,0)
+                if(r===0 && c===0) {
+                    let dot = document.createElement('div');
+                    dot.className = 'anchor-dot';
+                    dot.title = "锚点 (Anchor Point)";
+                    el.appendChild(dot);
+                }
+                divKer.appendChild(el);
+            }
+        }
+
+        // Draw Output
+        divOut.style.gridTemplateColumns = `repeat(${ow}, 45px)`;
+        divOut.innerHTML = '';
+        for(let r=0; r<oh; r++) {
+            for(let c=0; c<ow; c++) {
+                let el = document.createElement('div');
+                el.className = 'cell c-output';
+                el.textContent = '?';
+                el.id = `cell-out-${r}-${c}`;
+                divOut.appendChild(el);
+            }
+        }
+
+        // Update Labels
+        document.getElementById('dim-in').textContent = `${config.inRows}x${config.inCols}`;
+        document.getElementById('dim-ker').textContent = `${config.kRows}x${config.kCols}`;
+        document.getElementById('dim-out').textContent = `${oh}x${ow}`;
+    }
+
+    function updateVal(type, r, c, val) {
+        val = parseInt(val) || 0;
+        if(type==='in') config.dataInput[r][c] = val;
+        else config.dataKernel[r][c] = val;
+        recalc();
+    }
+
+    function updateStatus() {
+        let p = config.padding;
+        let txt = "";
+        if(config.mode === 'same') {
+             txt = `Same模式：输出尺寸(${steps.length > 0 ? document.getElementById('dim-out').textContent : '?'}) = 输入尺寸。` + 
+                   `为了容纳2x2核，我们在 右侧补${p.r}列，下方补${p.b}行 (Anchor在左上)。`;
+        } else {
+            txt = `Padding: Top:${p.t}, Bottom:${p.b}, Left:${p.l}, Right:${p.r}`;
+        }
+        document.getElementById('status-text').textContent = txt;
+    }
+
+    // --- Animation ---
+    function step(dir) {
+        stop();
+        let next = curStep + dir;
+        if(next < 0) next = 0;
+        if(next >= steps.length) next = steps.length - 1;
+        
+        curStep = next;
+        renderStep();
+    }
+
+    function renderStep() {
+        // Clear Highlights
+        document.querySelectorAll('.hl-scan').forEach(e => e.classList.remove('hl-scan'));
+        document.querySelectorAll('.hl-target').forEach(e => e.classList.remove('hl-target'));
+
+        if(curStep < 0 || curStep >= steps.length) return;
+
+        let s = steps[curStep];
+
+        // Highlight Input Area
+        s.hl.forEach(h => {
+            let id = h.type === 'real' ? `cell-in-${h.r}-${h.c}` : `cell-pad-${h.pr}-${h.pc}`;
+            let el = document.getElementById(id);
+            if(el) el.classList.add('hl-scan');
+        });
+
+        // Fill Outputs up to current
+        // And Highlight current
+        let outEl = document.getElementById(`cell-out-${s.outR}-${s.outC}`);
+        if(outEl) {
+            outEl.textContent = s.val;
+            outEl.classList.add('hl-target');
+        }
+        
+        // Show Math
+        document.getElementById('math-display').textContent = s.math;
+    }
+
+    function togglePlay() {
+        if(timer) {
+            stop();
+        } else {
+            if(curStep === steps.length-1) curStep = -1; // restart
+            document.getElementById('play-btn').textContent = "⏸ 暂停";
+            timer = setInterval(() => {
+                if(curStep < steps.length - 1) {
+                    step(1);
+                } else {
+                    stop();
+                }
+            }, 800);
+        }
+    }
+
+    function stop() {
+        clearInterval(timer);
+        timer = null;
+        document.getElementById('play-btn').textContent = "▶ 自动播放";
+    }
+
+    // Start
+    init();
+
+</script>
+</body>
+</html>

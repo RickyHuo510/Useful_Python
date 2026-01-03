@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ubuntu 24.04 Ultimate Sim</title>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --u-orange: #E95420;
+            --u-purple: #2c001e;
+            --win-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            font-family: 'Ubuntu', sans-serif;
+            background: url('https://raw.githubusercontent.com/Canonical/ubuntu-wallpapers/master/jammy/Ubuntu_22.04_LTS_-_Jammy_Jellyfish.jpg') no-repeat center center fixed;
+            background-size: cover;
+            background-color: #5E2750; 
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* --- UI Components --- */
+        #top-bar {
+            height: 28px; background: rgba(29, 29, 29, 0.98); color: #fff;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 12px; font-size: 13px; z-index: 2000; position: relative;
+        }
+        .tb-btn { padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .tb-btn:hover { background: rgba(255,255,255,0.1); }
+
+        #dock {
+            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+            width: 58px; background: rgba(20, 20, 20, 0.5); border-radius: 14px;
+            padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
+            backdrop-filter: blur(15px); z-index: 1000; border: 1px solid rgba(255,255,255,0.08);
+        }
+        .dock-item {
+            width: 48px; height: 48px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; position: relative; transition: 0.2s;
+        }
+        .dock-item:hover { transform: scale(1.1); }
+        .dock-dot {
+            position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
+            width: 5px; height: 5px; background: var(--u-orange); border-radius: 50%; display: none;
+        }
+        .dock-item.running .dock-dot { display: block; }
+
+        /* --- Window System --- */
+        .window {
+            position: absolute; background: #fff; border-radius: 8px;
+            box-shadow: var(--win-shadow); display: none; flex-direction: column;
+            overflow: hidden; resize: both; min-width: 400px; min-height: 300px;
+            animation: popIn 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .win-header {
+            height: 38px; background: #2c2c2c; color: #ddd; display: flex; align-items: center;
+            justify-content: center; cursor: grab; position: relative; font-weight: bold; font-size: 14px;
+        }
+        .win-header:active { cursor: grabbing; }
+        .win-controls { position: absolute; right: 10px; display: flex; gap: 8px; }
+        .win-btn { width: 18px; height: 18px; border-radius: 50%; border: none; cursor: pointer; }
+        .wb-close { background: #E95420; } .wb-min { background: #dedede; } .wb-max { background: #dedede; }
+
+        /* --- Terminal --- */
+        #term-win { width: 700px; height: 450px; top: 100px; left: 150px; background: #300a24; }
+        #term-body { padding: 10px; color: white; font-family: 'Ubuntu Mono', monospace; font-size: 15px; overflow-y: auto; flex: 1; }
+        .cmd-line { display: flex; }
+        .input-cmd { background: transparent; border: none; color: white; font-family: inherit; font-size: inherit; outline: none; flex: 1; margin-left: 5px;}
+        .prompt { color: #8ae234; font-weight: bold; } .path { color: #729fcf; font-weight: bold; }
+
+        /* --- Firefox --- */
+        #firefox-win { width: 900px; height: 600px; top: 50px; left: 100px; background: #fff; }
+        .ff-header { background: #1c1b22; color: white; height: 40px; } /* Firefox dark theme header */
+        .ff-toolbar { display: flex; gap: 10px; padding: 8px; background: #f9f9fb; border-bottom: 1px solid #e0e0e0; align-items: center; }
+        .ff-input { flex: 1; padding: 6px 15px; border-radius: 20px; border: 1px solid #ccc; outline: none; background: #fff; font-size: 13px; color: #333;}
+        .ff-input:focus { border-color: var(--u-orange); box-shadow: 0 0 0 2px rgba(233, 84, 32, 0.2); }
+        .ff-content { flex: 1; position: relative; background: white; }
+        iframe { width: 100%; height: 100%; border: none; }
+        .ff-blocker { 
+            position: absolute; top:0; left:0; width:100%; height:100%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #fff; z-index: 1;
+        }
+
+        /* --- Vim Editor --- */
+        #vim-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #1e1e1e; color: #ccc; font-family: 'Ubuntu Mono', monospace;
+            z-index: 5000; display: none; flex-direction: column; font-size: 16px;
+        }
+        #vim-area { flex: 1; background: #1e1e1e; color: #eee; border: none; outline: none; resize: none; padding: 10px; font-family: inherit; font-size: inherit; line-height: 1.5; }
+        #vim-status-bar { height: 25px; background: #333; color: white; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+        #vim-cmd-input { background: #333; border: none; color: white; outline: none; font-family: inherit; font-size: 14px; width: 200px; display: none; }
+        .vim-mode { font-weight: bold; background: #555; padding: 0 5px; color: #fff; }
+
+        /* --- Nautilus (Files) --- */
+        #files-win { width: 700px; height: 450px; top: 120px; left: 200px; background: #f7f7f7; }
+        .n-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); padding: 15px; gap: 10px; }
+        .f-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 10px; border-radius: 5px; text-align: center; }
+        .f-item:hover { background: #e5e5e5; }
+        .f-icon { font-size: 40px; margin-bottom: 5px; color: #888; }
+        .f-icon.dir { color: #E95420; }
+        
+    </style>
+</head>
+<body>
+
+    <header id="top-bar">
+        <div class="tb-btn">Activities</div>
+        <div class="tb-btn" id="clock">Oct 26 12:00</div>
+        <div style="display: flex; gap:10px;">
+            <i class="fas fa-network-wired"></i>
+            <i class="fas fa-volume-up"></i>
+            <i class="fas fa-battery-full"></i>
+        </div>
+    </header>
+
+    <nav id="dock">
+        <div class="dock-item" id="icon-ff" onclick="toggleWindow('firefox-win', 'icon-ff')">
+            <i class="fab fa-firefox-browser" style="font-size: 36px; color: #ff9500;"></i><span class="dock-dot"></span>
+        </div>
+        <div class="dock-item" id="icon-files" onclick="toggleWindow('files-win', 'icon-files')">
+            <i class="fas fa-folder" style="font-size: 36px; color: #E95420;"></i><span class="dock-dot"></span>
+        </div>
+        <div class="dock-item" id="icon-term" onclick="toggleWindow('term-win', 'icon-term')">
+            <i class="fas fa-terminal" style="font-size: 32px; color: #ddd; background:#333; padding:6px; border-radius:6px;"></i><span class="dock-dot"></span>
+        </div>
+        <div class="dock-item" onclick="localStorage.clear(); location.reload();" title="Reset System">
+            <i class="fas fa-trash-restore" style="font-size: 24px; color: #999;"></i>
+        </div>
+    </nav>
+
+    <!-- Firefox Window -->
+    <div id="firefox-win" class="window">
+        <div class="win-header" style="background: #1c1b22;">
+            <span>Mozilla Firefox</span>
+            <div class="win-controls">
+                <button class="win-btn wb-close" onclick="toggleWindow('firefox-win', 'icon-ff')"></button>
+            </div>
+        </div>
+        <div class="ff-toolbar">
+            <i class="fas fa-arrow-left" style="color:#555; cursor:pointer;" onclick="document.getElementById('browser-frame').contentWindow.history.back()"></i>
+            <i class="fas fa-redo" style="color:#555; cursor:pointer;" onclick="document.getElementById('browser-frame').src = document.getElementById('browser-frame').src"></i>
+            <input type="text" class="ff-input" id="ff-url" value="https://en.wikipedia.org" placeholder="Search or enter address">
+        </div>
+        <div class="ff-content">
+            <div class="ff-blocker" id="ff-home">
+                <h1 style="color:#333; font-size:40px;">G<span style="color:#E95420">oo</span>gle</h1>
+                <p style="color:#777">Only sites allowing "X-Frame-Options" work (e.g. Wikipedia).</p>
+            </div>
+            <iframe id="browser-frame" src=""></iframe>
+        </div>
+    </div>
+
+    <!-- Terminal Window -->
+    <div id="term-win" class="window">
+        <div class="win-header">
+            <span>user@ubuntu: ~</span>
+            <div class="win-controls"><button class="win-btn wb-close" onclick="toggleWindow('term-win', 'icon-term')"></button></div>
+        </div>
+        <div id="term-body" onclick="document.getElementById('cmd-input').focus()">
+            <div id="term-history">
+                Welcome to Ubuntu 24.04 LTS (Web Simulation)<br>
+                Type 'help' for commands. Try 'vim test.txt'.<br><br>
+            </div>
+            <div class="cmd-line">
+                <span class="prompt">user@ubuntu:</span><span class="path" id="term-path">~</span>$ 
+                <input type="text" id="cmd-input" class="input-cmd" autocomplete="off" spellcheck="false">
+            </div>
+        </div>
+    </div>
+
+    <!-- Files Window -->
+    <div id="files-win" class="window">
+        <div class="win-header">Files <div class="win-controls"><button class="win-btn wb-close" onclick="toggleWindow('files-win', 'icon-files')"></button></div></div>
+        <div style="padding:10px; border-bottom:1px solid #ddd; background:#fff; display:flex; gap:10px;">
+             <i class="fas fa-home" style="cursor:pointer" onclick="cd('~'); refreshFiles()"></i>
+             <span id="files-path-disp" style="color:#666">Home</span>
+        </div>
+        <div class="n-grid" id="files-grid"></div>
+    </div>
+
+    <!-- VIM Overlay -->
+    <div id="vim-overlay">
+        <textarea id="vim-area"></textarea>
+        <div id="vim-status-bar">
+            <div style="display:flex; gap:10px;">
+                <span class="vim-mode">NORMAL</span>
+                <span id="vim-filename">filename</span>
+            </div>
+            <input type="text" id="vim-cmd-input" placeholder="Type :w, :q, :wq">
+        </div>
+    </div>
+
+    <script>
+        // --- 1. File System Core (Persistent via LocalStorage) ---
+        const DEFAULT_FS = {
+            "root": {
+                "home": {
+                    "user": {
+                        "Documents": { "notes.txt": "Meeting at 10am" },
+                        "Downloads": { "installer.deb": "[Binary Data]" },
+                        "hello.py": "print('Hello Ubuntu')"
+                    }
+                }
+            }
+        };
+
+        let fileSystem = JSON.parse(localStorage.getItem('ubuntu_fs')) || DEFAULT_FS;
+        let currentPath = ["root", "home", "user"];
+
+        function saveFS() {
+            localStorage.setItem('ubuntu_fs', JSON.stringify(fileSystem));
+            refreshFiles();
+        }
+
+        function getDir(pathArr) {
+            let curr = fileSystem;
+            for(let p of pathArr) {
+                if(curr[p]) curr = curr[p];
+                else return null;
+            }
+            return curr;
+        }
+
+        function pathToStr(arr) {
+            if(arr.length === 3 && arr[2] === 'user') return "~";
+            let p = "/" + arr.slice(1).join("/");
+            return p.replace("/home/user", "~");
+        }
+
+        // --- 2. Terminal & Command Logic ---
+        const termInput = document.getElementById('cmd-input');
+        const termHist = document.getElementById('term-history');
+        const termPath = document.getElementById('term-path');
+
+        function printTerm(text, color="#eee") {
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.innerHTML = text; // allow html
+            termHist.appendChild(div);
+            document.getElementById('term-body').scrollTop = document.getElementById('term-body').scrollHeight;
+        }
+
+        termInput.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter') {
+                const raw = termInput.value.trim();
+                const parts = raw.split(" ");
+                const cmd = parts[0];
+                const args = parts.slice(1);
+                
+                printTerm(`<span style="color:#8ae234">user@ubuntu:${pathToStr(currentPath)}$</span> ${raw}`);
+                termInput.value = "";
+                
+                execute(cmd, args);
+            }
+        });
+
+        function execute(cmd, args) {
+            const dir = getDir(currentPath);
+            if(!dir) return;
+
+            switch(cmd) {
+                case 'ls':
+                    let out = Object.keys(dir).map(k => {
+                        const isDir = typeof dir[k] === 'object';
+                        return `<span style="color:${isDir?'#E95420':'#fff'}; margin-right:15px; font-weight:${isDir?'bold':'normal'}">${k}</span>`;
+                    }).join("");
+                    printTerm(out || "(empty)");
+                    break;
+                case 'cd':
+                    if(!args[0] || args[0] === '~') { currentPath = ["root", "home", "user"]; }
+                    else if(args[0] === '..') { if(currentPath.length > 1) currentPath.pop(); }
+                    else if(dir[args[0]] && typeof dir[args[0]] === 'object') { currentPath.push(args[0]); }
+                    else { printTerm(`cd: ${args[0]}: No such directory`, "#f55"); }
+                    termPath.innerText = pathToStr(currentPath);
+                    refreshFiles();
+                    break;
+                case 'mkdir':
+                    if(!args[0]) return printTerm("mkdir: missing operand");
+                    if(dir[args[0]]) return printTerm("mkdir: exists");
+                    dir[args[0]] = {};
+                    saveFS();
+                    break;
+                case 'touch':
+                    if(!args[0]) return printTerm("touch: missing operand");
+                    dir[args[0]] = "";
+                    saveFS();
+                    break;
+                case 'rm':
+                    if(!args[0]) return printTerm("rm: missing operand");
+                    if(!dir[args[0]]) return printTerm("rm: not found");
+                    delete dir[args[0]];
+                    saveFS();
+                    break;
+                case 'cat':
+                    if(!dir[args[0]]) return printTerm("cat: not found");
+                    if(typeof dir[args[0]] === 'object') return printTerm("cat: is a directory");
+                    printTerm(dir[args[0]]);
+                    break;
+                case 'echo':
+                    printTerm(args.join(" "));
+                    break;
+                case 'vim':
+                    if(!args[0]) return printTerm("vim: missing filename");
+                    openVim(args[0]);
+                    break;
+                case 'help':
+                    printTerm("Commands: ls, cd, mkdir, touch, rm, cat, echo, vim, clear, whoami");
+                    break;
+                case 'clear':
+                    termHist.innerHTML = "";
+                    break;
+                default:
+                    if(cmd) printTerm(`${cmd}: command not found`, "#f55");
+            }
+        }
+
+        // --- 3. Vim Implementation ---
+        let activeVimFile = null;
+        const vimOverlay = document.getElementById('vim-overlay');
+        const vimArea = document.getElementById('vim-area');
+        const vimCmd = document.getElementById('vim-cmd-input');
+        const vimMode = document.querySelector('.vim-mode');
+
+        function openVim(filename) {
+            const dir = getDir(currentPath);
+            // Check content or create new
+            const content = (dir[filename] && typeof dir[filename] !== 'object') ? dir[filename] : "";
+            
+            activeVimFile = filename;
+            vimArea.value = content;
+            document.getElementById('vim-filename').innerText = filename;
+            
+            vimOverlay.style.display = 'flex';
+            vimArea.focus();
+            vimMode.innerText = "INSERT"; // Simplified: Start in insert mode for usability
+        }
+
+        // Vim Controls
+        vimOverlay.addEventListener('keydown', (e) => {
+            if(e.key === 'Escape') {
+                e.preventDefault();
+                vimMode.innerText = "COMMAND";
+                vimCmd.style.display = 'block';
+                vimCmd.focus();
+                vimCmd.value = ":";
+            }
+        });
+
+        vimCmd.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter') {
+                const val = vimCmd.value.trim();
+                const dir = getDir(currentPath);
+                
+                if(val === ':w') {
+                    dir[activeVimFile] = vimArea.value;
+                    saveFS();
+                    vimCmd.style.display = 'none';
+                    vimArea.focus();
+                    vimMode.innerText = "INSERT";
+                    alert(`"${activeVimFile}" written`);
+                } 
+                else if(val === ':q') {
+                    closeVim();
+                } 
+                else if(val === ':wq') {
+                    dir[activeVimFile] = vimArea.value;
+                    saveFS();
+                    closeVim();
+                }
+                else {
+                    vimCmd.value = "E492: Not an editor command";
+                    setTimeout(() => { vimCmd.style.display='none'; vimArea.focus(); }, 1500);
+                }
+            }
+        });
+
+        function closeVim() {
+            vimOverlay.style.display = 'none';
+            vimCmd.style.display = 'none';
+            activeVimFile = null;
+            document.getElementById('cmd-input').focus();
+        }
+
+        // --- 4. Firefox Logic ---
+        const ffInput = document.getElementById('ff-url');
+        const ffFrame = document.getElementById('browser-frame');
+        const ffHome = document.getElementById('ff-home');
+
+        ffInput.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter') {
+                let url = ffInput.value;
+                if(!url.startsWith('http')) url = 'https://' + url;
+                
+                ffHome.style.display = 'none';
+                ffFrame.src = url;
+            }
+        });
+
+        // --- 5. Files App Logic ---
+        function refreshFiles() {
+            const grid = document.getElementById('files-grid');
+            const dir = getDir(currentPath);
+            document.getElementById('files-path-disp').innerText = pathToStr(currentPath);
+            grid.innerHTML = "";
+            
+            if(!dir) return;
+
+            Object.keys(dir).forEach(k => {
+                const isDir = typeof dir[k] === 'object';
+                const el = document.createElement('div');
+                el.className = 'f-item';
+                el.innerHTML = `<i class="fas ${isDir?'fa-folder dir':'fa-file-alt f-icon'}"></i><span>${k}</span>`;
+                
+                if(isDir) {
+                    el.ondblclick = () => { currentPath.push(k); termPath.innerText = pathToStr(currentPath); refreshFiles(); };
+                } else {
+                    el.ondblclick = () => { alert("Opening file: " + k + "\nContent:\n" + dir[k]); };
+                }
+                grid.appendChild(el);
+            });
+        }
+        refreshFiles();
+
+        // --- 6. Window Management ---
+        let zIndex = 100;
+        function toggleWindow(id, iconId) {
+            const w = document.getElementById(id);
+            const icon = document.getElementById(iconId);
+            
+            if(w.style.display === 'flex' && w.style.zIndex == zIndex) {
+                w.style.display = 'none'; // minimize
+                if(icon) icon.classList.remove('running');
+            } else {
+                w.style.display = 'flex';
+                zIndex++; w.style.zIndex = zIndex;
+                if(icon) icon.classList.add('running');
+                
+                if(id === 'term-win') document.getElementById('cmd-input').focus();
+            }
+        }
+
+        // Draggable
+        document.querySelectorAll('.window').forEach(win => {
+            const h = win.querySelector('.win-header');
+            win.addEventListener('mousedown', () => { zIndex++; win.style.zIndex = zIndex; });
+            h.addEventListener('mousedown', (e) => {
+                if(e.target.closest('.win-controls')) return;
+                const r = win.getBoundingClientRect();
+                const offX = e.clientX - r.left, offY = e.clientY - r.top;
+                
+                function move(ev) {
+                    win.style.left = (ev.clientX - offX) + 'px';
+                    win.style.top = (ev.clientY - offY) + 'px';
+                }
+                document.addEventListener('mousemove', move);
+                document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move), {once:true});
+            });
+        });
+
+        // Clock
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('clock').innerText = d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false});
+        }, 1000);
+
+    </script>
+</body>
+</html>

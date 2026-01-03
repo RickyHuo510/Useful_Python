@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卷积参数量计算可视化</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --input-color: #bbdefb;
+            --input-border: #2196f3;
+            --kernel-color: #ffcdd2;
+            --kernel-border: #e57373;
+            --bias-color: #fff9c4;
+            --bias-border: #fbc02d;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: var(--text-color);
+        }
+
+        h1 { margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+
+        /* 容器 */
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 1000px;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* 步骤导航 */
+        .stepper {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .step-btn {
+            background: none;
+            border: none;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            padding: 10px 20px;
+            border-radius: 20px;
+            transition: 0.3s;
+        }
+        .step-btn.active { background: #e3f2fd; color: #1565c0; }
+        .step-btn:hover { color: #1565c0; }
+
+        /* 主要展示区 */
+        .stage {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 50px;
+            perspective: 1000px;
+        }
+
+        /* 3D 堆叠效果 */
+        .stack-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            transition: 0.5s;
+        }
+
+        .layer {
+            width: 120px;
+            height: 120px;
+            border: 2px solid;
+            background: rgba(255,255,255,0.9);
+            margin-top: -80px; /* 堆叠感 */
+            transform: rotateX(60deg) rotateZ(-45deg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            transition: 0.3s;
+            position: relative;
+        }
+
+        .layer:first-child { margin-top: 0; }
+        
+        /* 样式变体 */
+        .layer.input {
+            background-color: var(--input-color);
+            border-color: var(--input-border);
+            width: 160px; height: 160px; /* Input更大 */
+        }
+
+        .layer.kernel {
+            background-color: var(--kernel-color);
+            border-color: var(--kernel-border);
+            width: 100px; height: 100px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            padding: 2px;
+            gap: 1px;
+        }
+
+        /* 4x4 Grid Cells */
+        .k-cell { background: rgba(0,0,0,0.1); width: 100%; height: 100%; }
+
+        .bias-node {
+            width: 30px; height: 30px;
+            background: var(--bias-color);
+            border: 2px solid var(--bias-border);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            position: absolute;
+            right: -40px;
+            bottom: 20px;
+            z-index: 10;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* 解释文字区 */
+        .explanation {
+            margin-top: 30px;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 5px solid #2196f3;
+        }
+
+        .formula {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #d32f2f;
+            margin-top: 10px;
+            display: block;
+        }
+
+        .highlight { color: #d32f2f; font-weight: bold; }
+        .blue { color: #1976d2; }
+
+        /* 箭头 */
+        .arrow { font-size: 40px; color: #bbb; }
+
+        /* 动画控制 */
+        .hidden { opacity: 0; pointer-events: none; position: absolute; }
+        .visible { opacity: 1; position: relative; }
+
+    </style>
+</head>
+<body>
+
+    <h1>卷积参数量：拆解可视化</h1>
+    <div class="subtitle">题目：输入3通道，输出6通道，核大小4x4。求参数量。</div>
+
+    <div class="container">
+        <!-- 导航 -->
+        <div class="stepper">
+            <button class="step-btn active" onclick="setStep(1)">1. 理解输入</button>
+            <button class="step-btn" onclick="setStep(2)">2. 解剖单个卷积核</button>
+            <button class="step-btn" onclick="setStep(3)">3. 堆叠输出通道</button>
+            <button class="step-btn" onclick="setStep(4)">4. 最终计算</button>
+        </div>
+
+        <!-- 舞台区 -->
+        <div id="view-1" class="stage visible">
+            <!-- Input Stack -->
+            <div class="stack-group">
+                <div style="margin-bottom:10px; font-weight:bold; color:#1565c0">输入特征 (Input)</div>
+                <div class="layer input">Channel 1</div>
+                <div class="layer input">Channel 2</div>
+                <div class="layer input">Channel 3</div>
+                <div style="margin-top:20px; color:#666">共 3 层<br>每层 32x32 (参数计算不看这个)</div>
+            </div>
+        </div>
+
+        <div id="view-2" class="stage hidden">
+            <!-- Single Filter Anatomy -->
+            <div class="stack-group">
+                <div style="margin-bottom:10px; font-weight:bold; color:#c62828">1个过滤器 (Filter)</div>
+                <!-- 3 Layers of Kernels -->
+                <div class="layer kernel">
+                    <!-- 4x4 grid simulation -->
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                </div>
+                <div class="layer kernel"><div style="position:absolute; transform:rotateZ(45deg); border:none;">...</div></div>
+                <div class="layer kernel">
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                    <div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div><div class="k-cell"></div>
+                </div>
+                
+                <!-- Bias -->
+                <div class="bias-node" title="偏置 (Bias)">+1</div>
+
+                <div style="margin-top:20px; color:#c62828; text-align:center">
+                    深度必须 = 输入通道数 (3)<br>
+                    才能处理输入数据
+                </div>
+            </div>
+        </div>
+
+        <div id="view-3" class="stage hidden">
+             <!-- 6 Filters -->
+             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px;">
+                <!-- Generating via JS for loop visualization -->
+                <div class="stack-group" style="transform: scale(0.7);">
+                    <div style="color:#c62828; font-weight:bold">Filter #1</div>
+                    <div class="layer kernel"></div><div class="layer kernel"></div><div class="layer kernel"></div><div class="bias-node" style="bottom:5px; right:-20px; width:20px; height:20px; font-size:10px;">B</div>
+                </div>
+                <div class="stack-group" style="transform: scale(0.7);">
+                    <div style="color:#c62828; font-weight:bold">Filter #2</div>
+                    <div class="layer kernel"></div><div class="layer kernel"></div><div class="layer kernel"></div><div class="bias-node" style="bottom:5px; right:-20px; width:20px; height:20px; font-size:10px;">B</div>
+                </div>
+                <div class="stack-group" style="transform: scale(0.7);">
+                    <div style="color:#c62828; font-weight:bold">Filter #3</div>
+                    <div class="layer kernel"></div><div class="layer kernel"></div><div class="layer kernel"></div><div class="bias-node" style="bottom:5px; right:-20px; width:20px; height:20px; font-size:10px;">B</div>
+                </div>
+                <div class="stack-group" style="transform: scale(0.7);">
+                    <div style="color:#c62828; font-weight:bold">Filter #4</div>
+                    <div class="layer kernel"></div><div class="layer kernel"></div><div class="layer kernel"></div><div class="bias-node" style="bottom:5px; right:-20px; width:20px; height:20px; font-size:10px;">B</div>
+                </div>
+                <div class="stack-group" style="transform: scale(0.7);">
+                    <div style="color:#c62828; font-weight:bold">Filter #5</div>
+                    <div class="layer kernel"></div><div class="layer kernel"></div><div class="layer kernel"></div><div class="bias-node" style="bottom:5px; right:-20px; width:20px; height:20px; font-size:10px;">B</div>
+                </div>
+                <div class="stack-group" style="transform: scale(0.7);">
+                    <div style="color:#c62828; font-weight:bold">Filter #6</div>
+                    <div class="layer kernel"></div><div class="layer kernel"></div><div class="layer kernel"></div><div class="bias-node" style="bottom:5px; right:-20px; width:20px; height:20px; font-size:10px;">B</div>
+                </div>
+             </div>
+        </div>
+        
+        <div id="view-4" class="stage hidden">
+            <div style="font-size: 2em; text-align: left; line-height: 1.8;">
+                <div>1. 单个 Filter 权重: <span class="highlight">4×4×3 = 48</span></div>
+                <div>2. 单个 Filter 偏置: <span style="color:#fbc02d; text-shadow:1px 1px 0 #999">+ 1</span></div>
+                <div>3. 单个 Filter 总数: <strong>49</strong></div>
+                <hr>
+                <div>4. 输出通道数: <span class="blue">× 6 个</span></div>
+                <div class="formula">Total = 49 × 6 = 294</div>
+            </div>
+        </div>
+
+        <!-- 解释区 -->
+        <div class="explanation" id="text-explain">
+            初始化...
+        </div>
+    </div>
+
+<script>
+    const explanations = {
+        1: `
+            <h3>第一步：看输入 (Input)</h3>
+            <p>题目给出输入特征是 3 个，即 <span class="blue">Input Channels = 3</span>。</p>
+            <p>你可以把它们想象成三层叠在一起的面包片（RGB图像也是3层）。</p>
+            <p><strong>注意：</strong> 输入的尺寸 32x32 在计算<b>参数量</b>时是没用的！无论图片多大，卷积核的大小是固定的。</p>
+        `,
+        2: `
+            <h3>第二步：解剖一个卷积核 (One Filter)</h3>
+            <p>这是最关键的一步！很多人以为一个 4x4 卷积核就是 16 个参数。</p>
+            <p><strong>错！</strong> 因为输入有 <span class="blue">3层</span>，所以一个过滤器必须也有 <span class="highlight">3层</span> 才能把它们同时卷起来。</p>
+            <p>一个过滤器的参数 = (4 × 4) × 3层 = 48 个权重。</p>
+            <p><strong>别忘了偏置(Bias)：</strong> 每个过滤器产生一张输出特征图，需要 1 个偏置项来调节。</p>
+            <p class="formula">单组参数 = 48 + 1 = 49</p>
+        `,
+        3: `
+            <h3>第三步：看输出 (Output)</h3>
+            <p>题目要求 <span class="blue">输出特征 6 个</span>。</p>
+            <p>这意味着我们需要 6 个不同的“过滤器”来提取 6 种不同的特征（比如有的提取横线，有的提取竖线）。</p>
+            <p>每一个过滤器都是独立的，都有自己的一套权重。</p>
+        `,
+        4: `
+            <h3>第四步：汇总计算</h3>
+            <p>现在我们把所有数字乘起来：</p>
+            <ul>
+                <li><strong>(核宽 × 核高 × 输入通道)</strong> = 4 × 4 × 3 = 48 (权重)</li>
+                <li><strong>加上偏置</strong> = 48 + 1 = 49 (一个过滤器的总参数)</li>
+                <li><strong>乘以输出通道</strong> = 49 × 6 (因为有6个过滤器)</li>
+            </ul>
+            <p class="formula">结果 = 294</p>
+            <p>选项 C 是正确的。</p>
+        `
+    };
+
+    function setStep(step) {
+        // Update Buttons
+        document.querySelectorAll('.step-btn').forEach((btn, idx) => {
+            if (idx + 1 === step) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+
+        // Update Views
+        for (let i = 1; i <= 4; i++) {
+            const el = document.getElementById(`view-${i}`);
+            if (i === step) {
+                el.classList.remove('hidden');
+                el.classList.add('visible');
+            } else {
+                el.classList.add('hidden');
+                el.classList.remove('visible');
+            }
+        }
+
+        // Update Text
+        document.getElementById('text-explain').innerHTML = explanations[step];
+    }
+
+    // Init
+    setStep(1);
+
+</script>
+</body>
+</html>

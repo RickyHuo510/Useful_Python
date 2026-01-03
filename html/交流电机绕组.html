@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+    body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f4f9; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h3 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+    .diagram-wrapper { overflow-x: auto; margin-bottom: 30px; }
+    
+    .winding-row { display: flex; align-items: center; margin-bottom: 10px; }
+    .label { width: 100px; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+    
+    .pole-bar { 
+        flex-grow: 1; height: 30px; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(90deg, #ffcccc 0%, #ffcccc 100%); /* N Pole Color */
+        border: 1px solid #dbaaaa; color: #a33; font-weight: bold;
+        position: relative;
+    }
+    .pole-bar::after { content: "N 极 (180° 电角度)"; }
+
+    .slots-container { display: flex; flex-grow: 1; gap: 2px; }
+    .slot { 
+        flex: 1; border: 1px solid #999; display: flex; flex-direction: column; 
+        text-align: center; font-size: 12px; min-width: 40px;
+    }
+    
+    /* Colors for Phases */
+    .p-A { background-color: #ffd700; color: #000; } /* Yellow */
+    .p-B { background-color: #90ee90; color: #000; } /* Green */
+    .p-C { background-color: #ff6b6b; color: #fff; } /* Red */
+    .p-X { background-color: #eec900; color: #555; opacity: 0.6; } /* Darker Yellow */
+    .p-Y { background-color: #6ebf6e; color: #555; opacity: 0.6; } /* Darker Green */
+    .p-Z { background-color: #cc5555; color: #eee; opacity: 0.8; } /* Darker Red */
+
+    .coil-side { flex: 1; display: flex; align-items: center; justify-content: center; padding: 5px 0; }
+    
+    .info-box { background: #eef; padding: 10px; border-left: 5px solid #55a; margin-top: 20px; font-size: 14px; }
+    .note { font-size: 12px; color: #666; margin-top: 5px; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>直观对比：单层 vs 双层绕组（一个极距下）</h2>
+    <p>假设这是一台三相电机，每极每相槽数 $q=2$。展示的是<b>N极</b>覆盖的范围。</p>
+
+    <!-- 磁极 -->
+    <div class="winding-row">
+        <div class="label">磁极区域</div>
+        <div class="pole-bar"></div>
+    </div>
+
+    <!-- 相带分布 (无论是单层还是双层，宏观磁场分布是一样的) -->
+    <div class="winding-row">
+        <div class="label">标准相带<br><span style="font-size:10px;font-weight:normal">60度相带</span></div>
+        <div class="slots-container">
+            <!-- A 相带 (0-60度) -->
+            <div class="slot p-A" style="flex:2">A 相区<br>(正)</div>
+            <!-- Z 相带 (60-120度, C的反向) -->
+            <div class="slot p-Z" style="flex:2">Z 相区<br>(C反)</div>
+            <!-- B 相带 (120-180度) -->
+            <div class="slot p-B" style="flex:2">B 相区<br>(正)</div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- 单层绕组 -->
+    <h3>1. 单层绕组 (Single Layer)</h3>
+    <div class="winding-row">
+        <div class="label">槽内分布</div>
+        <div class="slots-container">
+            <!-- q=2, 两个槽 -->
+            <div class="slot"><div class="coil-side p-A">A</div></div>
+            <div class="slot"><div class="coil-side p-A">A</div></div>
+            <!-- C的反向 -->
+            <div class="slot"><div class="coil-side p-Z">Z</div></div>
+            <div class="slot"><div class="coil-side p-Z">Z</div></div>
+            <!-- B的正向 -->
+            <div class="slot"><div class="coil-side p-B">B</div></div>
+            <div class="slot"><div class="coil-side p-B">B</div></div>
+        </div>
+    </div>
+    <div class="note">特点：每个槽里只有<b>1个</b>大的线圈边。必须填满整个相带。</div>
+
+    <br>
+
+    <!-- 双层绕组 -->
+    <h3>2. 双层绕组 (Double Layer) - 整距情况</h3>
+    <div class="winding-row">
+        <div class="label">槽内分布<br>(上/下层)</div>
+        <div class="slots-container">
+            <!-- 槽1 -->
+            <div class="slot">
+                <div class="coil-side p-A">A (上)</div>
+                <div class="coil-side p-A">A (下)</div>
+            </div>
+            <!-- 槽2 -->
+            <div class="slot">
+                <div class="coil-side p-A">A (上)</div>
+                <div class="coil-side p-A">A (下)</div>
+            </div>
+            <!-- 槽3 -->
+            <div class="slot">
+                <div class="coil-side p-Z">Z (上)</div>
+                <div class="coil-side p-Z">Z (下)</div>
+            </div>
+            <!-- 槽4 -->
+            <div class="slot">
+                <div class="coil-side p-Z">Z (上)</div>
+                <div class="coil-side p-Z">Z (下)</div>
+            </div>
+            <!-- 槽5 -->
+            <div class="slot">
+                <div class="coil-side p-B">B (上)</div>
+                <div class="coil-side p-B">B (下)</div>
+            </div>
+            <!-- 槽6 -->
+            <div class="slot">
+                <div class="coil-side p-B">B (上)</div>
+                <div class="coil-side p-B">B (下)</div>
+            </div>
+        </div>
+    </div>
+    <div class="note">特点：每个槽里有<b>2个</b>线圈边（上下层）。如果采用<b>短距</b>，下层边的颜色会向左移动，比如槽3的下层可能会变成A相，从而改善波形。</div>
+
+    <div class="info-box">
+        <strong>总结您的疑问：</strong><br>
+        1. 无论是单层还是双层，一个极下（N极）通常只有 <b>A, Z, B</b> 这三个区域（即 A, -C, B）。<br>
+        2. 另外的 <b>X, C, Y</b>（即 -A, C, -B）在下一个极（S极）下面。<br>
+        3. 所谓的 "XYZ" 其实就是 ABC 的尾巴，它们在空间上是和 ABC 穿插分布的，并不是双层绕组独有的。
+    </div>
+</div>
+
+</body>
+</html>
